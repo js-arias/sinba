@@ -102,6 +102,15 @@ sinba_mc_like <- function(t, Q, root, births, reps, xt, cond) {
   Q[4, 1] <- 0
   Q <- normalize_Q(Q)
 
+  root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
+
+  # we use scenarios to store the conditional likelihoods
+  # of the semi-active process.
+  scenarios <- list()
+
+  full <- full_conditionals(xt$parent, xt$nodes, xt$branch, cond, Q)
+  root_cond <- full_conditionals(xt$parent, xt$nodes, xt$branch, cond, root_Q)
+
   root_id <- length(t$tip.label) + 1
   likes <- c()
   for (rp in seq_len(reps)) {
@@ -124,6 +133,7 @@ sinba_mc_like <- function(t, Q, root, births, reps, xt, cond) {
         a2 <- b2$age
       }
 
+      sc <- ""
       if (a1 < a2) {
         # first trait is the oldest one
         sc <- scenario(r, 1)
@@ -169,12 +179,24 @@ sinba_mc_like <- function(t, Q, root, births, reps, xt, cond) {
           )
         )
       }
-      st <- as.integer(active_status(t, ev$first$node, ev$second$node))
-      root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
+      sm <- scenarios[[sc]]
+      if (is.null(sm)) {
+        # if the scenario has not been used
+        # estimate the semi-active conditionals
+        sm <- full_conditionals(
+          xt$parent, xt$nodes, xt$branch,
+          cond, ev$first$Q
+        )
+        scenarios[[sc]] <- sm
+      }
+
+      st <- as.integer(active_status(xt$parent, ev$first$node, ev$second$node))
+      op <- as.integer(to_optimize(xt$parent, ev$second$node))
 
       l <- sinba_conditionals(
-        xt$anc, xt$desc, st, xt$branch,
+        xt$parent, xt$nodes, st, op, xt$branch,
         cond,
+        full, sm, root_cond,
         ev$first$age, ev$second$age,
         root_Q, ev$first$Q, ev$second$Q
       )
@@ -422,10 +444,16 @@ semi_active_Q <- function(sc, Q) {
 # tree_to_cpp transforms a tree into a set of vectors
 # to be used in a CPP function.
 tree_to_cpp <- function(t) {
+  parent <- rep(-1, length(t$tip.label) + t$Nnode)
+  branch <- rep(0, length(t$tip.label) + t$Nnode)
+  for (i in seq_len(nrow(t$edge))) {
+    parent[t$edge[i, 2]] <- t$edge[i, 1] - 1
+    branch[t$edge[i, 2]] <- t$edge.length[i]
+  }
   return(list(
-    anc = as.integer(t$edge[, 1] - 1),
-    desc = as.integer(t$edge[, 2] - 1),
-    branch = t$edge.length
+    parent = as.integer(parent),
+    nodes = as.integer(t$edge[, 2] - 1),
+    branch = branch
   ))
 }
 
@@ -450,8 +478,8 @@ init_tree_conditionals <- function(t, xy) {
 
 # active_status returns a vector with the active status
 # of each node.
-active_status <- function(t, n1, n2) {
-  st <- rep(0, length(t$tip.label) + t$Nnode)
+active_status <- function(anc, n1, n2) {
+  st <- rep(0, length(anc))
   for (i in seq_len(length(st))) {
     if (i == n2) {
       st[i] <- 2
@@ -461,13 +489,25 @@ active_status <- function(t, n1, n2) {
       st[i] <- 1
       next
     }
-    if (is_parent(t, n2, i)) {
+    if (is_parent(anc, n2, i)) {
       st[i] <- 2
       next
     }
-    if (is_parent(t, n1, i)) {
+    if (is_parent(anc, n1, i)) {
       st[i] <- 1
     }
   }
   return(st)
+}
+
+# to_optimize returns a vector
+# with the nodes to be optimized.
+to_optimize <- function(anc, n) {
+  op <- rep(0, length(anc))
+  for (i in seq_len(length(op))) {
+    if (is_parent(anc, i, n)) {
+      op[i] <- 1
+    }
+  }
+  return(op)
 }

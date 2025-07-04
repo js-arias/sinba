@@ -112,17 +112,16 @@ path_to_node <- function(t, n) {
 }
 
 # is_parent returns true if node p is parent of n.
-is_parent <- function(t, p, n) {
+is_parent <- function(anc, p, n) {
   if (p == n) {
     # a node cannot be parent of itself
     return(FALSE)
   }
   while (TRUE) {
-    e <- which(t$edge[, 2] == n)
-    if (length(e) == 0) {
+    a <- anc[n] + 1
+    if (a == 0) {
       break
     }
-    a <- t$edge[e, 1]
     if (a == p) {
       return(TRUE)
     }

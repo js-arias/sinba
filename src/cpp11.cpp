@@ -6,16 +6,32 @@
 #include <R_ext/Visibility.h>
 
 // code.cpp
-cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double first_age, double second_age, doubles_matrix<> root_Q, doubles_matrix<> semi_Q, doubles_matrix<> Q);
-extern "C" SEXP _sinba_sinba_conditionals(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP first_age, SEXP second_age, SEXP root_Q, SEXP semi_Q, SEXP Q) {
+cpp11::doubles_matrix<> full_conditionals(integers anc, integers desc, doubles lengths, writable::doubles_matrix<> cond, doubles_matrix<> Q);
+extern "C" SEXP _sinba_full_conditionals(SEXP anc, SEXP desc, SEXP lengths, SEXP cond, SEXP Q) {
   BEGIN_CPP11
-    return cpp11::as_sexp(sinba_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(first_age), cpp11::as_cpp<cpp11::decay_t<double>>(second_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q)));
+    return cpp11::as_sexp(full_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q)));
+  END_CPP11
+}
+// code.cpp
+cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc, integers st, integers op, doubles lengths, writable::doubles_matrix<> cond, doubles_matrix<> full, doubles_matrix<> semi, doubles_matrix<> root, double first_age, double second_age, doubles_matrix<> root_Q, doubles_matrix<> semi_Q, doubles_matrix<> Q);
+extern "C" SEXP _sinba_sinba_conditionals(SEXP anc, SEXP desc, SEXP st, SEXP op, SEXP lengths, SEXP cond, SEXP full, SEXP semi, SEXP root, SEXP first_age, SEXP second_age, SEXP root_Q, SEXP semi_Q, SEXP Q) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(sinba_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<integers>>(op), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(full), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root), cpp11::as_cpp<cpp11::decay_t<double>>(first_age), cpp11::as_cpp<cpp11::decay_t<double>>(second_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q)));
+  END_CPP11
+}
+// code.cpp
+cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double first_age, double second_age, doubles_matrix<> root_Q, doubles_matrix<> semi_Q, doubles_matrix<> Q);
+extern "C" SEXP _sinba_full_sinba_conditionals(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP first_age, SEXP second_age, SEXP root_Q, SEXP semi_Q, SEXP Q) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(full_sinba_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(first_age), cpp11::as_cpp<cpp11::decay_t<double>>(second_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q)));
   END_CPP11
 }
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
-    {"_sinba_sinba_conditionals", (DL_FUNC) &_sinba_sinba_conditionals, 10},
+    {"_sinba_full_conditionals",       (DL_FUNC) &_sinba_full_conditionals,        5},
+    {"_sinba_full_sinba_conditionals", (DL_FUNC) &_sinba_full_sinba_conditionals, 10},
+    {"_sinba_sinba_conditionals",      (DL_FUNC) &_sinba_sinba_conditionals,      14},
     {NULL, NULL, 0}
 };
 }
