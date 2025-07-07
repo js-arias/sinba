@@ -4,7 +4,7 @@
 \alias{fit_sinba}
 \title{Maximum Likelihood Estimation of the Sinba Model Parameters}
 \usage{
-fit_sinba(tree, x, y, model = "IND", fixed = NULL, reps = 100)
+fit_sinba(tree, x, y, model = "IND", fixed = NULL, reps = 100, opts = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -31,6 +31,10 @@ and "y" in which trait y depends on x.}
 \item{fixed}{Use a transition matrix with fixed values.}
 
 \item{reps}{Number of replicates for the Monte Carlo integration.}
+
+\item{opts}{User defined parameters for the optimization
+with the \code{nloptr} package.
+By default it attempts a reasonable set of options.}
 }
 \description{
 \code{fit_sinba()} searches for the maximum likelihood estimate

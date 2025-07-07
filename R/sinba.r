@@ -81,6 +81,24 @@ normalize_Q <- function(Q) {
   return(Q)
 }
 
+# from_model_to_Q sets a Q matrix
+# from a model matrix
+# and a set of parameter values.
+from_model_to_Q <- function(model, par) {
+  Q <- matrix(nrow = nrow(model), ncol = ncol(model))
+  for (i in seq_len(nrow(model))) {
+    for (j in seq_len(ncol(model))) {
+      Q[i, j] <- 0
+      v <- model[i, j]
+      if (v == 0) {
+        next
+      }
+      Q[i, j] <- par[v]
+    }
+  }
+  return(Q)
+}
+
 # node_age returns the elapsed time
 # since the root time.
 node_age <- function(t, n) {

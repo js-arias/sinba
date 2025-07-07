@@ -41,6 +41,14 @@ doubles conditional(doubles to, doubles_matrix<> Q, double time)
 		double sum = 0;
 		for (int j = 0; j < to.size(); j++)
 		{
+			double p = pm(i, j);
+			if (p <= 0)
+			{
+				// in some particular cases
+				// there are values smaller than 0
+				// (because of rounding)
+				continue;
+			}
 			sum += pm(i, j) * exp(to[j] - mx);
 		}
 		x[i] = log(sum) + mx;

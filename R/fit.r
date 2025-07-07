@@ -1,4 +1,5 @@
 #' @import stats
+#' @import nloptr
 
 #' @export
 #' @title Maximum Likelihood Estimation of the Sinba Model Parameters
@@ -27,7 +28,12 @@
 #'   and "y" in which trait y depends on x.
 #' @param fixed Use a transition matrix with fixed values.
 #' @param reps Number of replicates for the Monte Carlo integration.
-fit_sinba <- function(tree, x, y, model = "IND", fixed = NULL, reps = 100) {
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+fit_sinba <- function(
+    tree, x, y, model = "IND", fixed = NULL, reps = 100,
+    opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -66,7 +72,6 @@ fit_sinba <- function(tree, x, y, model = "IND", fixed = NULL, reps = 100) {
     births <- list()
     births[[1]] <- birth_event(tree, youngest[[1]], reps)
     births[[2]] <- birth_event(tree, youngest[[2]], reps)
-
     xt <- tree_to_cpp(tree)
     cond <- init_tree_conditionals(tree, xy)
 
@@ -90,6 +95,102 @@ fit_sinba <- function(tree, x, y, model = "IND", fixed = NULL, reps = 100) {
   k <- max(mQ)
   rownames(mQ) <- xy_levels
   colnames(mQ) <- xy_levels
+
+  if (is.null(opts)) {
+    v <- 1 / reps
+    if (v < 1e-04) {
+      v <- 1e-04
+    }
+    opts <- list(
+      "algorithm" = "NLOPT_LN_SBPLX",
+      # set the upper bound using the number of replicates
+      xtol_abs = rep(v, max(mQ)),
+      maxeval = 10000
+    )
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  # the upper bound is a change per branch
+  upper <- length(tree$edge) / sum(tree$edge.length)
+
+  # closure for the nloptr function
+  like_func <- function(t, d, dx, dy, m) {
+    youngest <- youngest_event(t, dx, dy)
+    root <- sinba_root(t, dx, dy)
+
+    xt <- tree_to_cpp(t)
+    cond <- init_tree_conditionals(t, d)
+
+    # we put all the random birth events inside the closure
+    # so we make sure that all attempts are evaluated
+    # with the same evens.
+    births <- list()
+    births[[1]] <- birth_event(t, youngest[[1]], reps)
+    births[[2]] <- birth_event(t, youngest[[2]], reps)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+      if (any(p > upper)) {
+        return(Inf)
+      }
+
+      Q <- from_model_to_Q(m, p)
+      l <- sinba_mc_like(t, Q, root, births, reps, xt, cond)
+      return(-l)
+    })
+  }
+  fn <- like_func(tree, xy, x, y, mQ)
+
+  par <- runif(max(mQ), max = upper)
+  best <- list()
+
+  # for the equal rates model use Brent
+  if (max(mQ) == 1) {
+    best <- stats::optim(par, fn,
+      method = "Brent", lower = 0, upper = upper
+    )
+  } else {
+    # initial guess using an equal rates model
+    erm <- model_matrix("ER")
+    erf <- like_func(tree, xy, x, y, erm)
+    ep <- par[1]
+    best <- stats::optim(ep, erf,
+      method = "Brent", lower = 0, upper = upper
+    )
+
+    ep <- best$par[1]
+    par <- rep(ep, max(mQ))
+    res <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    best$par <- res$solution
+    best$value <- res$objective
+  }
+  q <- from_model_to_Q(mQ, best$par)
+  q <- normalize_Q(q)
+  rownames(q) <- xy_levels
+  colnames(q) <- xy_levels
+  obj <- list(
+    logLik = -best$value,
+    model = model,
+    k = k,
+    rates = best$par,
+    index.matrix = mQ,
+    Q = q,
+    states = xy_levels,
+    pi <- rep(0.25, 4),
+    root.prior = "flat",
+    data = xy,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
 }
 
 # sinba_mc_like calculates the likelihood
