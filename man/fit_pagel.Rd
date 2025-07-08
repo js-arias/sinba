@@ -34,6 +34,12 @@ and "y" in which trait y depends on x.}
 with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
 }
+\value{
+An object of class "fit_pagel",
+or,
+if a \code{fixed} Q matrix is defined,
+an object of class "fixed_pagel".
+}
 \description{
 \code{fit_pagel()} searches for the maximum likelihood estimate
 of a given model for two traits

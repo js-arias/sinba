@@ -30,6 +30,11 @@
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
+#'
+#' @return An object of class "fit_pagel",
+#'   or,
+#'   if a `fixed` Q matrix is defined,
+#'   an object of class "fixed_pagel".
 fit_pagel <- function(tree, x, y, model = "IND", fixed = NULL, opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_pagel: `tree` must be an object of class \"phylo\".")
@@ -172,6 +177,50 @@ fit_pagel <- function(tree, x, y, model = "IND", fixed = NULL, opts = NULL) {
   )
   class(obj) <- "fit_pagel"
   return(obj)
+}
+
+#' @export
+#' @title Extract Log-Likelihood From a "fit_pagel" Object
+#'
+#' @description
+#' This method implements the `logLik` method
+#' on a "fit_pagel" object.
+#'
+#' @param object An object of type "fit_pagel".
+#' @param ... Additional arguments are unused.
+logLik.fit_pagel <- function(object, ...) {
+  l <- object$logLik
+  attr(l, "df") <- object$k
+  attr(l, "nobs") <- length(object$data)
+  class(l) <- "logLik"
+  return(l)
+}
+
+#' @export
+#' @title Basic Print For a "fit_pagel" Object
+#'
+#' @description
+#' This method implements the `print` method
+#' on a `fit_pagel` object.
+#'
+#' @param x An of type "fit_pagel".
+#' @param digits The number of digits for decimal output.
+#' @param ... Additional arguments are unused.
+print.fit_pagel <- function(x, digits = 6, ...) {
+  cat("Object of class \"fit_pagel\".\n\n")
+  cat("Fitted value of Q:\n")
+  print(x$Q)
+  cat("\nSet value of pi:\n")
+  print(x$pi)
+  cat(paste("\nLog-likelihood = ", round(x$logLik, digits), ".\n",
+    sep = ""
+  ))
+  cat(paste("Model: ", x$model, ".\n", sep = ""))
+  aic <- 2 * x$k - 2 * x$logLik
+  cat(paste("AIC  = ", round(aic, digits), ".\n", sep = ""))
+  aicc <- aic + (2 * x$k * x$k + 2 * x$k) / (length(x$data) - x$k - 1)
+  cat(paste("AICc = ", round(aicc, digits), ".\n", sep = ""))
+  cat(paste("Free parameters = ", x$k, ".\n", sep = ""))
 }
 
 # pagel_like calculates the likelihood
