@@ -36,6 +36,12 @@ and "y" in which trait y depends on x.}
 with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
 }
+\value{
+An object of class "fit_sinba",
+or,
+if a \code{fixed} Q matrix is defined,
+and object of class "fixed_sinba".
+}
 \description{
 \code{fit_sinba()} searches for the maximum likelihood estimate
 of a given model for two traits,
