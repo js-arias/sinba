@@ -151,7 +151,7 @@ fit_sinba <- function(
   }
   fn <- like_func(tree, xy, x, y, mQ)
 
-  par <- runif(max(mQ), max = upper)
+  par <- stats::runif(max(mQ), max = upper)
   best <- list()
 
   # for the equal rates model use Brent
