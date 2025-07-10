@@ -62,6 +62,7 @@ fit_sinba <- function(
   )
   xy_levels <- levels(xy)
 
+
   if (!is.null(fixed)) {
     if (nrow(fixed) != ncol(fixed)) {
       stop("fit_sinba: `fixed` must be an square matrix.")
@@ -80,7 +81,13 @@ fit_sinba <- function(
     xt <- tree_to_cpp(tree)
     cond <- init_tree_conditionals(tree, xy)
 
-    l <- sinba_mc_like(tree, fixed, root, births, reps, xt, cond)
+    # probability of two valid births
+    two_birth_prob <- prob_valid_birth(tree, youngest)
+
+    l <- sinba_mc_like(
+      tree, fixed, root, births, reps, xt, cond,
+      two_birth_prob
+    )
 
     pi <- rep(0.25, 4)
     names(pi) <- xy_levels
@@ -129,6 +136,9 @@ fit_sinba <- function(
     xt <- tree_to_cpp(t)
     cond <- init_tree_conditionals(t, d)
 
+    # probability of two valid births
+    two_birth_prob <- prob_valid_birth(tree, youngest)
+
     # we put all the random birth events inside the closure
     # so we make sure that all attempts are evaluated
     # with the same evens.
@@ -145,7 +155,7 @@ fit_sinba <- function(
       }
 
       Q <- from_model_to_Q(m, p)
-      l <- sinba_mc_like(t, Q, root, births, reps, xt, cond)
+      l <- sinba_mc_like(t, Q, root, births, reps, xt, cond, two_birth_prob)
       return(-l)
     })
   }
@@ -247,7 +257,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 
 # sinba_mc_like calculates the likelihood
 # using a Monte Carlo integration.
-sinba_mc_like <- function(t, Q, root, births, reps, xt, cond) {
+sinba_mc_like <- function(t, Q, root, births, reps, xt, cond, tb_prob) {
   # make sure that Q matrix is valid
   Q[1, 4] <- 0
   Q[2, 3] <- 0
@@ -358,7 +368,7 @@ sinba_mc_like <- function(t, Q, root, births, reps, xt, cond) {
   }
 
   mx <- max(likes)
-  l <- log(sum(exp(likes - mx))) - log(length(likes)) + mx
+  l <- log(sum(exp(likes - mx))) - log(length(likes) / tb_prob) + mx
   return(l)
 }
 
@@ -431,6 +441,18 @@ youngest_birth_node <- function(t, x, state) {
   }
   return(x)
 }
+
+# prob_valid_birth returns the probability of a valid birth
+# if the birth events are pick at random.
+prob_valid_birth <- function(t, youngest) {
+  # add a minimum value if the nodes
+  # are in the root
+  x1 <- length_to_root(t, youngest[[1]]) + 1e-10
+  x2 <- length_to_root(t, youngest[[2]]) + 1e-10
+  tot <- sum(t$edge.length)
+  return((x1 * x2) / (tot * tot))
+}
+
 
 # dollo_uppass returns the first node
 # in which the state born.

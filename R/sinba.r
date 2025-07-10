@@ -129,6 +129,21 @@ path_to_node <- function(t, n) {
   return(x)
 }
 
+# length_to_root returns the total length from a node
+# towards the root.
+length_to_root <- function(t, n) {
+  s <- 0
+  while (TRUE) {
+    e <- which(t$edge[, 2] == n)
+    if (length(e) == 0) {
+      break
+    }
+    s <- s + t$edge.length[e]
+    n <- t$edge[e, 1]
+  }
+  return(s)
+}
+
 # is_parent returns true if node p is parent of n.
 is_parent <- function(anc, p, n) {
   if (p == n) {
