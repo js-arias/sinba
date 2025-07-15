@@ -101,6 +101,9 @@ fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
       if (any(p < 0)) {
         return(Inf)
       }
+      if (any(p[3:length(p)] > 1000)) {
+        return(Inf)
+      }
       births <- list()
       for (i in 1:2) {
         if (p[i] > ages[ye[[i]]]) {
