@@ -123,6 +123,7 @@ fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
     })
   }
   fn <- like_func(tree, xy, x, y, mQ, youngest, ages)
+  par <- c(runif(2, min = 1e-6, max = 1e-5), runif(max(mQ), max = upper))
   res <- nloptr::nloptr(
     x0 = par,
     eval_f = fn,
