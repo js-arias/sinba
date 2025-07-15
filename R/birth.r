@@ -63,11 +63,11 @@ fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
   colnames(mQ) <- xy_levels
 
   if (is.null(opts)) {
-    v <- 1e-04
+    v <- 1e-06
     opts <- list(
       "algorithm" = "NLOPT_LN_SBPLX",
       # set the upper bound using the number of replicates
-      xtol_abs = rep(v, max(mQ)),
+      xtol_abs = rep(v, 2 + max(mQ)),
       maxeval = 10000
     )
   }
@@ -153,6 +153,82 @@ fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
     )
     births[[i]] <- b
   }
+  b1 <- births[[1]]
+  b2 <- births[[2]]
+  if (b1$node != b2$node) {
+    if (is_parent(xt$parent, b2$node, b1$node)) {
+      b2 <- births[[1]]
+      b1 <- births[[2]]
+    }
+  } else {
+    if (b1$age > b2$age) {
+      b2 <- births[[1]]
+      b1 <- births[[2]]
+    }
+  }
+  st <- active_status(xt$parent, b1$node, b2$node)
+  hist <- tree
+  maps <- vector(mode = "list", length = nrow(tree$edge))
+  node_states <- matrix(0, nrow = nrow(tree$edge), ncol = ncol(tree$edge))
+  for (i in seq_len(nrow(tree$edge))) {
+    a <- tree$edge[i, 1]
+    n <- tree$edge[i, 2]
+    node_states[i, 1] <- st[a]
+    node_states[i, 2] <- st[n]
+    map <- vector()
+
+    if (st[a] == 0) {
+      if (st[n] == 2) {
+        # two events in the same branch
+
+        # birth of the semi active process
+        map[1] <- b1$age
+        names(map)[1] <- "0"
+
+        # birth of the active process
+        map[2] <- b2$age - b1$age
+        names(map)[2] <- "1"
+
+        # end of the branch
+        map[3] <- tree$edge.length[i] - b2$age
+        names(map)[3] <- "2"
+      } else if (st[n] == 1) {
+        # birth of the semi active process
+        map[1] <- b1$age
+        names(map)[1] <- "0"
+
+        # end of the branch
+        map[2] <- tree$edge.length[i] - b1$age
+        names(map)[2] <- "1"
+      } else {
+        map[1] <- tree$edge.length[i]
+        names(map)[1] <- "0"
+      }
+    } else if (st[a] == 1) {
+      if (st[n] == 2) {
+        # birth of the active process
+        map[1] <- b2$age
+        names(map)[1] <- "1"
+
+        # end of the branch
+        map[2] <- tree$edge.length[i] - b2$age
+        names(map)[2] <- "2"
+      } else {
+        map[1] <- tree$edge.length[i]
+        names(map)[1] <- "1"
+      }
+    } else {
+      map[1] <- tree$edge.length[i]
+      names(map)[1] <- "2"
+    }
+    maps[[i]] <- map
+  }
+  hist$node.states <- node_states
+  tips <- st[seq_len(length(tree$tip.label))]
+  names(tips) <- tree$tip.label
+  hist$states <- tips
+  hist$maps <- maps
+  class(hist) <- c("simmap", setdiff(class(hist), "simmap"))
 
   obj <- list(
     logLik = -res$objective,
@@ -166,7 +242,7 @@ fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
     pi = pi,
     root.prior = "flat",
     data = xy,
-    tree = tree
+    tree = hist
   )
   class(obj) <- "fit_sinba_births"
   return(obj)
