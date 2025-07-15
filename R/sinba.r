@@ -162,3 +162,25 @@ is_parent <- function(anc, p, n) {
   }
   return(FALSE)
 }
+
+# node_length returns a list with the total distance
+# from the node to the root.
+node_lengths <- function(t) {
+  nl <- c()
+  for (i in seq_len(length(t$tip.label) + t$Nnode)) {
+    l <- length_to_root(t, i)
+    nl <- c(nl, l)
+  }
+  return(nl)
+}
+
+# get_node_by_age returns a node in a path
+# using the age a of the node
+get_node_by_age <- function(p, ages, a) {
+  for (i in p) {
+    if (ages[i] >= a) {
+      return(i)
+    }
+  }
+  return(-1)
+}
