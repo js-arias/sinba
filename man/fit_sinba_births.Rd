@@ -4,7 +4,15 @@
 \alias{fit_sinba_births}
 \title{Maximum Likelihood Estimation of the Sinba Model Parameters Including Births}
 \usage{
-fit_sinba_births(tree, x, y, model = "IND", opts = NULL)
+fit_sinba_births(
+  tree,
+  x,
+  y,
+  model = "IND",
+  fixed = NULL,
+  births = NULL,
+  opts = NULL
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -28,9 +36,27 @@ in which changes between states are equal;
 "x" for a model in which trait x depends on y;
 and "y" in which trait y depends on x.}
 
+\item{fixed}{Use a transition matrix with fixed values.}
+
+\item{births}{A list with the two birth events.
+Each element of the list must contain the fields
+\code{node} with the node at the end of the edge
+in which the event happens,
+and \code{age} the time from the start of the edge
+in which the event happens.
+One of the nodes in the birth pair
+must be an ancestor of other node.}
+
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
+}
+\value{
+An object of class "fit_sinba_births",
+or,
+if \code{fixed} Q matrix
+and \code{birth} list are defined,
+an object of class "fixed_sinba_births".
 }
 \description{
 \code{fit_sinba_births()} searches for the maximum likelihood estimate

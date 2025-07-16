@@ -30,10 +30,28 @@
 #'   in which changes between states are equal;
 #'   "x" for a model in which trait x depends on y;
 #'   and "y" in which trait y depends on x.
+#' @param fixed Use a transition matrix with fixed values.
+#' @param births A list with the two birth events.
+#'   Each element of the list must contain the fields
+#'   `node` with the node at the end of the edge
+#'   in which the event happens,
+#'   and `age` the time from the start of the edge
+#'   in which the event happens.
+#'   One of the nodes in the birth pair
+#'   must be an ancestor of other node.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
-fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
+#'
+#' @return An object of class "fit_sinba_births",
+#'   or,
+#'   if `fixed` Q matrix
+#'   and `birth` list are defined,
+#'   an object of class "fixed_sinba_births".
+fit_sinba_births <- function(
+    tree, x, y, model = "IND", fixed = NULL,
+    births = NULL,
+    opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba_births: `tree` must be an object of class \"phylo\".")
   }
@@ -56,6 +74,64 @@ fit_sinba_births <- function(tree, x, y, model = "IND", opts = NULL) {
     names(x)
   )
   xy_levels <- levels(xy)
+
+  if (!is.null(fixed)) {
+    if (nrow(fixed) != ncol(fixed)) {
+      stop("fit_sinba_births: `fixed` must be an square matrix.")
+    }
+    if (nrow(fixed) != 4) {
+      stop("fit_sinba_births: `fixed` must be an square matrix.")
+    }
+    rownames(fixed) <- xy_levels
+    colnames(fixed) <- xy_levels
+
+    if (length(births) < 2) {
+      stop("fit_sinba_births: `births` should have at least two elements")
+    }
+    for (b in births) {
+      if (is.null(b$node)) {
+        stop("fit_sinba_births: expecting `node` in an element of `births`")
+      }
+      if (is.null(b$age)) {
+        stop("fit_sinba_births: expecting `age` in an element of `births`")
+      }
+    }
+
+    xt <- tree_to_cpp(tree)
+
+    if (births[[1]]$node != births[[2]]$node) {
+      if (!is_parent(xt$parent, births[[1]]$node, births[[2]]$node)) {
+        if (!is_parent(xt$parent, births[[2]]$node, births[[1]]$node)) {
+          stop("fit_sinba_births: nodes in `births` not related")
+        }
+      }
+    }
+
+    root <- sinba_root(tree, x, y)
+    cond <- init_tree_conditionals(tree, xy)
+
+    # event probability is scaled with the total tree length
+    # scaled by the maximum tip distance.
+    ages <- node_lengths(tree)
+    ev_prob <- 2 * log(max(ages) / sum(tree$edge.length))
+
+    l <- sinba_birth_like(tree, fixed, root, births, xt, cond, ev_prob)
+
+    pi <- rep(0.25, 4)
+    names(pi) <- xy_levels
+    obj <- list(
+      logLik = l,
+      Q = normalize_Q(fixed),
+      births = births,
+      states = xy_levels,
+      pi = pi,
+      root.prior = "flat",
+      data = xy,
+      tree = tree
+    )
+    class(obj) <- "fixed_sinba_births"
+    return(obj)
+  }
 
   mQ <- model_matrix(model)
   k <- max(mQ)
