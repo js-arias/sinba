@@ -212,7 +212,14 @@ cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
 	return cond;
 }
 
-// full_sinba_conditionals is used for testing
+// full_sinba_conditionals calculates the likelihood conditionals
+// using a vector anc with parent nodes,
+// vector desc with descendant nodes,
+// vector st with the activate status of the node,
+// vector lengths with the the branch lengths of each edge,
+// a matrix with the conditionals of the tips,
+// the ages (in a brach) of each event,
+// and the Q matrices.
 [[cpp11::register]]
 cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc,
 						integers st, doubles lengths,
