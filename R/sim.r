@@ -171,7 +171,7 @@ evolve_states <- function(t, semiQ, Q, states, n, births) {
 
 sim_evolution <- function(Q, len, s) {
   t <- 0
-  while (TRUE) {
+  while (Q[s, s] != 0) {
     dt <- stats::rexp(1, rate = -Q[s, s])
     if (t + dt >= len) {
       break
