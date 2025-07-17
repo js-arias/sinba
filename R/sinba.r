@@ -163,6 +163,26 @@ is_parent <- function(anc, p, n) {
   return(FALSE)
 }
 
+# is_parent_in_tree returns true if node p is parent of n.
+is_parent_in_tree <- function(t, p, n) {
+  if (p == n) {
+    # a node cannot be parent of itself
+    return(FALSE)
+  }
+  while (TRUE) {
+    e <- which(t$edge[, 2] == n)
+    if (length(e) == 0) {
+      break
+    }
+    a <- t$edge[e, 1]
+    if (a == p) {
+      return(TRUE)
+    }
+    n <- a
+  }
+  return(FALSE)
+}
+
 # node_length returns a list with the total distance
 # from the node to the root.
 node_lengths <- function(t) {
@@ -183,4 +203,19 @@ get_node_by_age <- function(p, ages, a) {
     }
   }
   return(-1)
+}
+
+# node_size returns the number of terminals
+# for a given node.
+node_size <- function(t, n) {
+  if (n <= length(t$tip.label)) {
+    return(1)
+  }
+  sum <- 0
+  for (x in seq_len(length(t$tip.label))) {
+    if (is_parent_in_tree(t, n, x)) {
+      sum <- sum + 1
+    }
+  }
+  return(sum)
 }
