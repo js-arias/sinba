@@ -1,7 +1,7 @@
 #' @import stats
 #' @import nloptr
 
-#' @export
+# Deprecated function
 #' @title Maximum Likelihood Estimation of the Sinba Model Parameters
 #'
 #' @description
@@ -36,7 +36,7 @@
 #'   or,
 #'   if a `fixed` Q matrix is defined,
 #'   and object of class "fixed_sinba".
-fit_sinba <- function(
+dep_fit_sinba <- function(
     tree, x, y, model = "IND", fixed = NULL, reps = 100,
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
@@ -375,22 +375,109 @@ sinba_mc_like <- function(t, Q, root, births, reps, xt, cond, tb_prob) {
 # sinba_root return the valid states
 # for the root in the sinba model.
 sinba_root <- function(t, x, y) {
-  root <- c()
+  root_states <- c()
   for (i in levels(x)) {
-    n <- youngest_birth_node(t, x, i)
     for (j in levels(y)) {
       s <- paste(i, j, sep = "|")
-      root[s] <- 0
-      if (n != length(t$tip.label) + 1) {
-        next
-      }
-      m <- youngest_birth_node(t, y, j)
-      if (m != length(t$tip.label) + 1) {
-        next
-      }
-      root[s] <- 1
+      root_states <- c(root_states, s)
     }
   }
+
+  root_id <- length(t$tip.label) + 1
+  root <- rep(0, 4)
+  # do all the combinations
+
+  n <- youngest_birth_node(t, x, levels(x)[1])
+  if (n == root_id) {
+    m <- youngest_birth_node(t, y, levels(y)[1])
+    if (m == root_id) {
+      # both states x0 and y0 start at the root
+      root[1] <- 1
+    } else {
+      # only x0 starts at the root,
+      # as y0 stats at other node,
+      # then y1 should be in the root.
+      root[2] <- 1
+    }
+    m <- youngest_birth_node(t, y, levels(y)[2])
+    if (m == root_id) {
+      # both states x0 and y1 start at the root
+      root[2] <- 1
+    } else {
+      # only x0 starts at the root,
+      # as y1 stats at other node,
+      # then y0 should be in the root.
+      root[1] <- 1
+    }
+  } else {
+    # x0 starts in another node
+    # so we know that x1 should be in the root.
+    m <- youngest_birth_node(t, y, levels(y)[1])
+    if (m == root_id) {
+      # both states x1 and y0 start at the root
+      root[3] <- 1
+    } else {
+      # as y0 stats at other node,
+      # then y1 should be in the root.
+      root[4] <- 1
+    }
+    m <- youngest_birth_node(t, y, levels(y)[2])
+    if (m == root_id) {
+      # both states x1 and y1 start at the root
+      root[4] <- 1
+    } else {
+      # as y1 stats at other node,
+      # then y0 should be in the root.
+      root[3] <- 1
+    }
+  }
+
+  n <- youngest_birth_node(t, x, levels(x)[2])
+  if (n == root_id) {
+    m <- youngest_birth_node(t, y, levels(y)[1])
+    if (m == root_id) {
+      # both states x1 and y0 start at the root
+      root[3] <- 1
+    } else {
+      # only x1 starts at the root,
+      # as y0 stats at other node,
+      # then y1 should be in the root.
+      root[4] <- 1
+    }
+    m <- youngest_birth_node(t, y, levels(y)[2])
+    if (m == root_id) {
+      # both states x1 and y1 start at the root
+      root[4] <- 1
+    } else {
+      # only x1 starts at the root,
+      # as y1 stats at other node,
+      # then y0 should be in the root.
+      root[3] <- 1
+    }
+  } else {
+    # x1 starts in another node
+    # so we know that x0 should be in the root.
+    m <- youngest_birth_node(t, y, levels(y)[1])
+    if (m == root_id) {
+      # both states x0 and y0 start at the root
+      root[1] <- 1
+    } else {
+      # as y0 stats at other node,
+      # then y1 should be in the root.
+      root[2] <- 1
+    }
+    m <- youngest_birth_node(t, y, levels(y)[2])
+    if (m == root_id) {
+      # both states x0 and y1 start at the root
+      root[2] <- 1
+    } else {
+      # as y1 stats at other node,
+      # then y0 should be in the root.
+      root[1] <- 1
+    }
+  }
+
+  names(root) <- root_states
   return(root)
 }
 
