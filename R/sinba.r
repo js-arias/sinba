@@ -66,21 +66,6 @@ model_matrix <- function(model = "") {
   ), nrow = 4, byrow = TRUE))
 }
 
-# normalize_Q set the diagonal of the Q matrix.
-normalize_Q <- function(Q) {
-  for (i in seq_len(nrow(Q))) {
-    s <- 0
-    for (j in seq_len(ncol(Q))) {
-      if (i == j) {
-        next
-      }
-      s <- s + Q[i, j]
-    }
-    Q[i, i] <- -s
-  }
-  return(Q)
-}
-
 # from_model_to_Q sets a Q matrix
 # from a model matrix
 # and a set of parameter values.
@@ -127,40 +112,6 @@ path_to_node <- function(t, n) {
     n <- t$edge[e, 1]
   }
   return(x)
-}
-
-# length_to_root returns the total length from a node
-# towards the root.
-length_to_root <- function(t, n) {
-  s <- 0
-  while (TRUE) {
-    e <- which(t$edge[, 2] == n)
-    if (length(e) == 0) {
-      break
-    }
-    s <- s + t$edge.length[e]
-    n <- t$edge[e, 1]
-  }
-  return(s)
-}
-
-# is_parent returns true if node p is parent of n.
-is_parent <- function(anc, p, n) {
-  if (p == n) {
-    # a node cannot be parent of itself
-    return(FALSE)
-  }
-  while (TRUE) {
-    a <- anc[n] + 1
-    if (a == 0) {
-      break
-    }
-    if (a == p) {
-      return(TRUE)
-    }
-    n <- a
-  }
-  return(FALSE)
 }
 
 # is_parent_in_tree returns true if node p is parent of n.

@@ -541,41 +541,6 @@ prob_valid_birth <- function(t, youngest) {
 }
 
 
-# dollo_uppass returns the first node
-# in which the state born.
-dollo_uppass <- function(t, n, ns) {
-  # the node does not have the state
-  if (!ns[n]) {
-    return(0)
-  }
-
-  # the node is a tip
-  if (n <= length(t$tip.label)) {
-    return(0)
-  }
-
-  desc <- which(t$edge[, 1] == n)
-  ws <- 0
-  for (i in desc) {
-    if (ns[t$edge[i, 2]]) {
-      ws <- ws + 1
-    }
-  }
-  if (ws > 1) {
-    # more than one descendant has the state
-    # so the state in the node is present
-    return(n)
-  }
-
-  for (i in desc) {
-    x <- dollo_uppass(t, t$edge[i, 2], ns)
-    if (x > 0) {
-      return(x)
-    }
-  }
-  return(0)
-}
-
 # birth_event returns the age and node locations
 # of one or more birth events.
 birth_event <- function(t, n, num = 1) {
@@ -703,22 +668,6 @@ semi_active_Q <- function(sc, Q) {
   stop(msg)
 }
 
-# tree_to_cpp transforms a tree into a set of vectors
-# to be used in a CPP function.
-tree_to_cpp <- function(t) {
-  parent <- rep(-1, length(t$tip.label) + t$Nnode)
-  branch <- rep(0, length(t$tip.label) + t$Nnode)
-  for (i in seq_len(nrow(t$edge))) {
-    parent[t$edge[i, 2]] <- t$edge[i, 1] - 1
-    branch[t$edge[i, 2]] <- t$edge.length[i]
-  }
-  return(list(
-    parent = as.integer(parent),
-    nodes = as.integer(t$edge[, 2] - 1),
-    branch = branch
-  ))
-}
-
 # init_tree_conditionals creates the tree conditionals
 # from a tree
 # and its observations.
@@ -736,30 +685,6 @@ init_tree_conditionals <- function(t, xy) {
   }
   colnames(cond) <- levels(xy)
   return(cond)
-}
-
-# active_status returns a vector with the active status
-# of each node.
-active_status <- function(anc, n1, n2) {
-  st <- rep(0, length(anc))
-  for (i in seq_len(length(st))) {
-    if (i == n2) {
-      st[i] <- 2
-      next
-    }
-    if (i == n1) {
-      st[i] <- 1
-      next
-    }
-    if (is_parent(anc, n2, i)) {
-      st[i] <- 2
-      next
-    }
-    if (is_parent(anc, n1, i)) {
-      st[i] <- 1
-    }
-  }
-  return(st)
 }
 
 # to_optimize returns a vector
