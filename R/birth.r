@@ -160,12 +160,16 @@ fit_sinba_births <- function(
   like_func <- function(t, d, dx, dy, m, ye, a) {
     root <- sinba_root(t, dx, dy)
 
+    print(root)
+
     xt <- tree_to_cpp(t)
     cond <- init_tree_conditionals(t, d)
 
     # event probability is scaled with the total tree length
     # scaled by the maximum tip distance.
     ev_prob <- 2 * log(max(ages) / sum(t$edge.length))
+
+    print(sprintf("births: %.6f + root: %.6f = %.6f", ev_prob, log(0.25), ev_prob + log(0.25)))
 
     paths <- list()
     for (i in 1:2) {
@@ -321,6 +325,8 @@ fit_sinba_births <- function(
     tree = hist
   )
   class(obj) <- "fit_sinba_births"
+  print(sprintf("likelihood: %.6f, AIC: %.6f", obj$logLik, AIC(obj)))
+
   return(obj)
 }
 

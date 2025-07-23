@@ -6,15 +6,19 @@
 phylo_to_sinba <- function(tree) {
   parent <- rep(0, length(tree$tip.label) + tree$Nnode)
   br_len <- rep(0, length(tree$tip.label) + tree$Nnode)
+  ages <- rep(0, length(tree$tip.label) + tree$Nnode)
   for (i in seq_len(nrow(tree$edge))) {
-    parent[tree$edge[i, 2]] <- tree$edge[i, 1]
-    br_len[tree$edge[i, 2]] <- tree$edge.length[i]
+    n <- tree$edge[i, 2]
+    parent[n] <- tree$edge[i, 1]
+    br_len[n] <- tree$edge.length[i]
+    ages[n] <- ages[parent[n]] + br_len[n]
   }
   return(list(
     root_id = length(tree$tip.label) + 1,
     parent = parent,
     edge = tree$edge[, 2],
     br_len = br_len,
+    ages = ages,
     tip = tree$tip.label
   ))
 }
@@ -45,27 +49,23 @@ is_parent <- function(t, p, n) {
   return(FALSE)
 }
 
-# length_to_root returns the total length from a node
-# towards the root.
-length_to_root <- function(t, n) {
-  s <- 0
+# get_node_by_len returns a node
+# at a given "age" l (length from the root),
+# in the path between n and the root.
+get_node_by_len <- function(t, l, n) {
   while (n > 0) {
-    s <- s + t$br_len[n]
+    a <- t$age[n] - t$br_len[n]
+    if (a < l) {
+      return(n)
+    }
     n <- t$parent[n]
   }
-  return(s)
+  return(t$root_id)
 }
 
 # prob_birth returns the probability of a birth event.
 prob_birth <- function(t) {
-  max <- 0
-  for (i in seq_len(length(t$tip))) {
-    l <- length_to_root(t, i)
-    if (l > max) {
-      max <- l
-    }
-  }
-  return(max / sum(t$br_len))
+  return(max(t$ages) / sum(t$br_len))
 }
 
 # active_status returns a vector with the active status
