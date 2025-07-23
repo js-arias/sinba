@@ -186,7 +186,7 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
 #'   all states will have the same probability.
 fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
   if (!inherits(tree, "phylo")) {
-    stop("fit_sinba_single: `tree` must be an object of class \"phylo\".")
+    stop("fixed_sinba_single: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
@@ -196,31 +196,31 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
     root <- rep(1, ncol(cond))
   }
   if (length(root) != ncol(cond)) {
-    stop("fit_sinba_single: invalid size for `root` vector.")
+    stop("fixed_sinba_single: invalid size for `root` vector.")
   }
   root <- root / sum(root)
 
   if (is.null(rate_mat)) {
-    stop("fit_sinba_single: `rate_mat` must be a matrix")
+    stop("fixed_sinba_single: `rate_mat` must be a matrix")
   }
   if (nrow(rate_mat) != ncol(rate_mat)) {
-    stop("fit_sinba_single: `rate_mat` must be a square matrix")
+    stop("fixed_sinba_single: `rate_mat` must be a square matrix")
   }
   if (nrow(rate_mat) != 2) {
-    stop("fit_sinba_single: `rate_mat` should be 2x2")
+    stop("fixed_sinba_single: `rate_mat` should be 2x2")
   }
 
   if (is.null(birth)) {
-    stop("fit_sinba_single: undefined `birth` event")
+    stop("fixed_sinba_single: undefined `birth` event")
   }
   if (is.null(birth$node)) {
-    stop("fit_sinba_singe: expecting field `node` of `birth`")
+    stop("fixed_sinba_singe: expecting field `node` of `birth`")
   }
   if (is.null(birth$age)) {
-    stop("fit_sinba_singe: expecting field `age` of `birth`")
+    stop("fixed_sinba_singe: expecting field `age` of `birth`")
   }
   if (birth$age > t$br_len[birth$node]) {
-    stop("fit_sinba_singe: invalid value for field `age` of `birth`")
+    stop("fixed_sinba_singe: invalid value for field `age` of `birth`")
   }
 
   ev_prob <- log(prob_birth(t))
@@ -232,7 +232,7 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
     y <- youngest[[1]]
     if (y[2] != birth$node) {
       if (!is_parent(t, birth$node, y[2])) {
-        # invalid birth event
+        # invalid root state
         root_prob[1] <- 0
       }
     }
@@ -241,7 +241,7 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
     y <- youngest[[1]]
     if (y[1] != birth$node) {
       if (!is_parent(t, birth$node, y[1])) {
-        # invalid birth event
+        # invalid root state
         root_prob[2] <- 0
       }
     }
