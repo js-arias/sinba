@@ -161,6 +161,38 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
 }
 
 #' @export
+#' @title Basic Print For a "fit_sinba_single" Object
+#'
+#' @description
+#' This method implements the `print` method
+#' on a `fit_sinba_single` object.
+#'
+#' @param x An object of type "fit_sinba_single".
+#' @param digits The number of digits for decimal output.
+#' @param ... Additional arguments are unused.
+print.fit_sinba_single <- function(x, digits = 6, ...) {
+  cat("Single Sinba: Fit\n")
+  aic <- 2 * x$k - 2 * x$logLik
+  aicc <- aic + (2 * x$k * x$k + 2 * x$k) / (length(x$tree$tip.label) - x$k - 1)
+  fit <- c(x$logLik, aic, aicc)
+  names(fit) <- c("logLik", "AIC", "AICc")
+  print(fit)
+
+  cat("Birth event:\n")
+  b <- x$birth
+  cat(paste("- Node ", b$node, " time ", round(b$age, digits), "\n", sep = ""))
+  cat("Rates:\n")
+  Q <- x$Q
+  rownames(Q) <- c(0, 1)
+  colnames(Q) <- c(0, 1)
+  print(Q)
+  cat("Root prior:\n")
+  root <- x$root_prior
+  names(root) <- c(0, 1)
+  print(root)
+}
+
+#' @export
 #' @title
 #' Estimate the Likelihood for a Given Sinba Transition Matrix in a Single Trait
 #'
@@ -281,7 +313,7 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
 #' @title Basic Print For a "fixed_sinba_single" Object
 #'
 #' @description
-#' This method implements yje `print` method
+#' This method implements the `print` method
 #' on a `fixed_sinba_single` object.
 #'
 #' @param x An object of type "fixed_sinba_single".
