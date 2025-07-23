@@ -247,6 +247,20 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
     }
   }
 
+  if (all(root_prob == 0)) {
+    obj <- list(
+      logLik = -Inf,
+      Q = normalize_Q(rate_mat),
+      birth = birth,
+      states = c(0, 1),
+      root_prior = root,
+      data = data,
+      tree = tree
+    )
+    class(obj) <- "fixed_sinba_single"
+    return(obj)
+  }
+
   xt <- tree_to_cpp(t)
   lk <- sinba_single_like(t, rate_mat, cond, log(root_prob), birth, xt, ev_prob)
 
