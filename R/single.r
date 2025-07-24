@@ -161,6 +161,24 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
 }
 
 #' @export
+#' @title Extract Log-Likelihood From a "fit_sinba_single" Object
+#'
+#' @description
+#' This method implements the `logLik` method
+#' on a "fit_sinba_single" object.
+#'
+#' @param object An object of type "fit_sinba_single".
+#' @param ... Additional arguments are unused.
+logLik.fit_sinba_single <- function(object, ...) {
+  l <- object$logLik
+  attr(l, "df") <- object$k
+  attr(l, "nobs") <- length(object$tree$tip.label)
+  class(l) <- "logLik"
+  return(l)
+}
+
+
+#' @export
 #' @title Basic Print For a "fit_sinba_single" Object
 #'
 #' @description
