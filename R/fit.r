@@ -224,6 +224,47 @@ fixed_sinba <- function(
   return(obj)
 }
 
+#' @export
+#' @title Basic Print For a "fixed_sinba" Object
+#'
+#' @description
+#' This method implements the `print` method
+#' on a `fixed_sinba` object.
+#'
+#' @param x An object of type "fixed_sinba".
+#' @param digits The number of digits for decimal output.
+#' @param ... Additional arguments are unused.
+print.fixed_sinba <- function(x, digits = 6, ...) {
+  cat("Sinba: Fixed Rate Matrix\n")
+  cat(paste("Log-Likelihood = ", round(x$logLik, digits), "\n", sep = ""))
+  cat("Birth events:\n")
+  n <- colnames(x$data)
+  b1 <- x$births[[1]]
+  cat(paste("- Trait ", n[2], " Node ",
+    b1$node, " time ", round(b1$age, digits), "\n",
+    sep = ""
+  ))
+  b3 <- x$births[[2]]
+  cat(paste("- Trait ", n[3], " Node ",
+    b3$node, " time ", round(b3$age, digits), "\n",
+    sep = ""
+  ))
+  cat("Rates:\n")
+  Q <- x$Q
+  rownames(Q) <- x$states
+  colnames(Q) <- x$states
+  print(Q)
+  cat("Semi active rate matrix:\n")
+  semi <- x$semi_Q
+  rownames(semi) <- x$states
+  colnames(semi) <- x$states
+  print(semi)
+  cat("Root prior:\n")
+  root <- x$root_prior
+  names(root) <- x$states
+  print(root)
+}
+
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(t, Q, semi_Q, births, xt, cond, root_prior, ev_prob) {
