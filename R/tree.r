@@ -53,6 +53,9 @@ is_parent <- function(t, p, n) {
 # at a given "age" l (length from the root),
 # in the path between n and the root.
 get_node_by_len <- function(t, l, n) {
+  if (l > t$ag[n]) {
+    return(0)
+  }
   while (n > 0) {
     a <- t$age[n] - t$br_len[n]
     if (a < l) {

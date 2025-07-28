@@ -1,3 +1,219 @@
+#' @import nloptr
+
+#' @export
+#' @title
+#' Maximum Likelihood Estimation of the Sinba Model
+#'
+#' @description
+#' `fit_sinba()` searches for the maximum likelihood estimate
+#' with the Sinba model for two traits.
+#' It estimate the values of the parameters for the Q matrices
+#' as well as the birth events.
+#'
+#' @param tree A phylogenetic tree of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+#' @param model Model of evolution for the traits.
+#'   By default it uses the independent model ("IND").
+#'   Other valid values are "ARD"
+#'   or "xy" for a fully correlated model.
+#' @param root Root prior probabilities.
+#'   By default,
+#'   all states will have the same probability.
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
+  if (!inherits(tree, "phylo")) {
+    stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  cond <- init_conditionals(t, data, 2)
+
+  if (is.null(root)) {
+    root <- rep(1, ncol(cond))
+  }
+  if (length(root) != ncol(cond)) {
+    stop("fixed_sinba: invalid size for `root` vector.")
+  }
+  root <- root / sum(root)
+
+  mQ <- model_matrix(model)
+  m_semi <- model_matrix("IND")
+  k <- max(mQ) + max(m_semi) + 2
+
+  youngest <- youngest_birth_event(t, cond)
+  ev_prob <- 2 * log(prob_birth(t))
+
+  # closure for the likelihood function
+  like_func <- function(yn) {
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+      if (any(p[3:length(p)] > 1000)) {
+        return(Inf)
+      }
+
+      births <- list()
+      for (i in 1:2) {
+        n <- get_node_by_len(t, p[i], yn[i])
+        if (n <= 0) {
+          return(Inf)
+        }
+        b <- list(
+          node = n,
+          age = t$br_len[n] + p[i] - t$age[n]
+        )
+        births[[i]] <- b
+      }
+      b1 <- births[[1]]
+      b2 <- births[[2]]
+
+      root_prob <- root
+      y1 <- youngest[[1]]
+      y2 <- youngest[[2]]
+      if (root[1] > 0) {
+        # ancestral state is 00
+        # check is trait 1-1 can be born
+        if (y1[2] != b1$node) {
+          if (!is_parent(t, b1$node, y1[2])) {
+            # invalid root state
+            root_prob[1] <- 0
+          }
+        }
+        # check if trait 2-1 can be born
+        if (y2[2] != b2$node) {
+          if (!is_parent(t, b2$node, y2[2])) {
+            # invalid root state
+            root_prob[1] <- 0
+          }
+        }
+      }
+      if (root[2] > 0) {
+        # ancestral state is 01
+        # check is trait 1-1 can be born
+        if (y1[2] != b1$node) {
+          if (!is_parent(t, b1$node, y1[2])) {
+            # invalid root state
+            root_prob[2] <- 0
+          }
+        }
+        # check if trait 2-0 can be born
+        if (y2[1] != b2$node) {
+          if (!is_parent(t, b2$node, y2[1])) {
+            # invalid root state
+            root_prob[2] <- 0
+          }
+        }
+      }
+      if (root[3] > 0) {
+        # ancestral state is 10
+        # check is trait 1-0 can be born
+        if (y1[1] != b1$node) {
+          if (!is_parent(t, b1$node, y1[1])) {
+            # invalid root state
+            root_prob[3] <- 0
+          }
+        }
+        # check if trait 2-1 can be born
+        if (y2[2] != b2$node) {
+          if (!is_parent(t, b2$node, y2[2])) {
+            # invalid root state
+            root_prob[3] <- 0
+          }
+        }
+      }
+      if (root[4] > 0) {
+        # ancestral state is 11
+        # check is trait 1-0 can be born
+        if (y1[1] != b1$node) {
+          if (!is_parent(t, b1$node, y1[1])) {
+            # invalid root state
+            root_prob[4] <- 0
+          }
+        }
+        # check if trait 2-0 can be born
+        if (y2[1] != b2$node) {
+          if (!is_parent(t, b2$node, y2[1])) {
+            # invalid root state
+            root_prob[4] <- 0
+          }
+        }
+      }
+      if (all(root_prob == 0)) {
+        return(Inf)
+      }
+      Q <- from_model_to_Q(mQ, p[3:(2 + max(mQ))])
+      semi_Q <- from_model_to_Q(m_semi, p[(2 + max(mQ) + 1):length(p)])
+      lk <- sinba_like(
+        t, Q, semi_Q, births, xt, cond,
+        log(root_prob), ev_prob
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    v <- 1e-06
+    opts <- list(
+      "algorithm" = "NLOPT_LN_SBPLX",
+      # set the upper bound using the number of replicates
+      xtol_abs = rep(v, 3),
+      maxeval = 10000
+    )
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  # check all possible birth events
+  y1 <- youngest[[1]]
+  y2 <- youngest[[2]]
+  ev <- list()
+  if (!(any(y1 == t$root_id))) {
+    y1 <- c(y1, t$root_id)
+  }
+  if (!(any(y2 == t$root_id))) {
+    y2 <- c(y2, t$root_id)
+  }
+  for (yn1 in y1) {
+    for (yn2 in y2) {
+      if (yn1 != yn2) {
+        if (!is_parent(t, yn1, yn2) && !is_parent(t, yn2, yn1)) {
+          next
+        }
+      }
+      ev[[length(ev) + 1]] <- c(yn1, yn2)
+    }
+  }
+
+  res <- list(objective = Inf)
+  for (i in sample(seq_len(length(ev)))) {
+    e <- ev[[i]]
+    fn <- like_func(e)
+    par <- c(
+      runif(1, max = t$age[e[1]]),
+      runif(1, max = t$age[e[2]]), runif(k - 2)
+    )
+    r <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    if (r$objective < res$objective) {
+      res <- r
+      res$ev_nodes <- e
+    }
+  }
+}
+
 #' @export
 #' @title
 #' Estimate the Likelihood for a Given Sinba Transition Matrices in Two Traits

@@ -1,3 +1,71 @@
+# model_matrix returns a design matrix for a given model.
+model_matrix <- function(model = "") {
+  if (model == "ER") {
+    # equal rates model
+    return(matrix(c(
+      0, 1, 1, 0,
+      1, 0, 0, 1,
+      1, 0, 0, 1,
+      0, 1, 1, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if (model == "ER2") {
+    # equal rates model
+    return(matrix(c(
+      0, 1, 2, 0,
+      1, 0, 0, 2,
+      2, 0, 0, 1,
+      0, 2, 1, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if (model == "SYM") {
+    # symmetric model
+    return(matrix(c(
+      0, 1, 2, 0,
+      1, 0, 0, 3,
+      2, 0, 0, 4,
+      0, 3, 4, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if ((model == "xy") || (model == "ARD")) {
+    # correlated model
+    return(matrix(c(
+      0, 1, 2, 0,
+      3, 0, 0, 4,
+      5, 0, 0, 6,
+      0, 7, 8, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if (model == "x") {
+    # correlated model,
+    # x depends on y.
+    return(matrix(c(
+      0, 1, 2, 0,
+      3, 0, 0, 4,
+      5, 0, 0, 1,
+      0, 6, 3, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if (model == "y") {
+    # correlated model,
+    # y depends on x.
+    return(matrix(c(
+      0, 1, 2, 0,
+      3, 0, 0, 2,
+      4, 0, 0, 5,
+      0, 4, 6, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+
+  # by default returns the independent model
+  return(matrix(c(
+    0, 1, 2, 0,
+    3, 0, 0, 2,
+    4, 0, 0, 1,
+    0, 4, 3, 0
+  ), nrow = 4, byrow = TRUE))
+}
+
 # from_model_to_Q sets a Q matrix
 # from a model matrix
 # and a set of parameter values.
