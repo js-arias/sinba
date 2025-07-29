@@ -19,7 +19,15 @@
 #' @param model Model of evolution for the traits.
 #'   By default it uses the independent model ("IND").
 #'   Other valid values are "ARD"
-#'   or "xy" for a fully correlated model.
+#'   or "xy" for a fully correlated model;
+#'   "ER" for a model in which both traits have equal rates
+#'   in any direction;
+#'   "ER2" for an equal rates model,
+#'   but rates are different for each trait;
+#'   "SYM" for the symmetric model
+#'   in which changes between states are equal;
+#'   "x" for a model in which trait x depends on y;
+#'   and "y" in which trait y depends on x.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -43,8 +51,7 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
   root <- root / sum(root)
 
   mQ <- model_matrix(model)
-  m_semi <- model_matrix("IND")
-  k <- max(mQ) + max(m_semi) + 2
+  k <- max(mQ) + 2
 
   youngest <- youngest_birth_event(t, cond)
   ev_prob <- 2 * log(prob_birth(t))
@@ -150,8 +157,8 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
       if (all(root_prob == 0)) {
         return(Inf)
       }
-      Q <- from_model_to_Q(mQ, p[3:(2 + max(mQ))])
-      semi_Q <- from_model_to_Q(m_semi, p[(2 + max(mQ) + 1):length(p)])
+      Q <- from_model_to_Q(mQ, p[3:length(p)])
+      semi_Q <- Q
       lk <- sinba_like(
         t, Q, semi_Q, births, xt, cond,
         log(root_prob), ev_prob
@@ -212,6 +219,96 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
       res$ev_nodes <- e
     }
   }
+
+  q <- from_model_to_Q(mQ, res$solution[3:length(res$solution)])
+  q <- normalize_Q(q)
+  births <- list()
+  for (i in 1:2) {
+    n <- get_node_by_len(t, res$solution[i], res$ev_node[i])
+    if (n <= 0) {
+      return(Inf)
+    }
+    b <- list(
+      node = n,
+      age = t$br_len[n] + res$solution[i] - t$age[n]
+    )
+    births[[i]] <- b
+  }
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    states = c("00", "01", "10", "11"),
+    root_prior = root,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
+}
+
+#' @export
+#' @title Extract Log-Likelihood From a "fit_sinba" Object
+#'
+#' @description
+#' This method implements the `logLik` method
+#' on a "fit_sinba" object.
+#'
+#' @param object An object of type "fit_sinba".
+#' @param ... Additional arguments are unused.
+logLik.fit_sinba <- function(object, ...) {
+  l <- object$logLik
+  attr(l, "df") <- object$k
+  attr(l, "nobs") <- 2 * length(object$tree$tip.label)
+  class(l) <- "logLik"
+  return(l)
+}
+
+#' @export
+#' @title Basic Print For a "fit_sinba" Object
+#'
+#' @description
+#' This method implements the `print` method
+#' on a `fit_sinba` object.
+#'
+#' @param x An of type "fit_sinba".
+#' @param digits The number of digits for decimal output.
+#' @param ... Additional arguments are unused.
+print.fit_sinba <- function(x, digits = 6, ...) {
+  cat("Sinba: Fit\n")
+  cat(paste("Model: ", x$model, ".\n", sep = ""))
+  cat(paste("Free parameters = ", x$k, ".\n", sep = ""))
+
+  aic <- 2 * x$k - 2 * x$logLik
+  aicc <- aic + (2 * x$k * x$k + 2 * x$k) /
+    (2 * length(x$tree$tip.label) - x$k - 1)
+  fit <- c(x$logLik, aic, aicc)
+  names(fit) <- c("logLik", "AIC", "AICc")
+  print(fit)
+
+  cat("Birth events:\n")
+  n <- colnames(x$data)
+  b1 <- x$births[[1]]
+  cat(paste("- Trait ", n[2], " Node ",
+    b1$node, " time ", round(b1$age, digits), "\n",
+    sep = ""
+  ))
+  b3 <- x$births[[2]]
+  cat(paste("- Trait ", n[3], " Node ",
+    b3$node, " time ", round(b3$age, digits), "\n",
+    sep = ""
+  ))
+  cat("Rates:\n")
+  Q <- x$Q
+  rownames(Q) <- x$states
+  colnames(Q) <- x$states
+  print(Q)
+  cat("Root prior:\n")
+  root <- x$root_prior
+  names(root) <- x$states
+  print(root)
 }
 
 #' @export

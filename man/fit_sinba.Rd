@@ -18,7 +18,15 @@ Any other column will be ignored.}
 \item{model}{Model of evolution for the traits.
 By default it uses the independent model ("IND").
 Other valid values are "ARD"
-or "xy" for a fully correlated model.}
+or "xy" for a fully correlated model;
+"ER" for a model in which both traits have equal rates
+in any direction;
+"ER2" for an equal rates model,
+but rates are different for each trait;
+"SYM" for the symmetric model
+in which changes between states are equal;
+"x" for a model in which trait x depends on y;
+and "y" in which trait y depends on x.}
 
 \item{root}{Root prior probabilities.
 By default,
