@@ -184,20 +184,42 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
   y1 <- youngest[[1]]
   y2 <- youngest[[2]]
   ev <- list()
-  if (!(any(y1 == t$root_id))) {
-    y1 <- c(y1, t$root_id)
-  }
-  if (!(any(y2 == t$root_id))) {
-    y2 <- c(y2, t$root_id)
-  }
   for (yn1 in y1) {
+    if (yn1 == t$root_id) {
+      next
+    }
     for (yn2 in y2) {
+      if (yn2 == t$root_id) {
+        next
+      }
       if (yn1 != yn2) {
         if (!is_parent(t, yn1, yn2) && !is_parent(t, yn2, yn1)) {
           next
         }
       }
       ev[[length(ev) + 1]] <- c(yn1, yn2)
+    }
+  }
+  if (length(ev) == 0) {
+    # at least one of the traits start at the root
+    if (any(y1 != t$root_id)) {
+      for (yn1 in y1) {
+        if (yn1 == t$root_id) {
+          next
+        }
+        ev[[length(ev) + 1]] <- c(yn1, t$root_id)
+      }
+    } else if (any(y2 != t$root_id)) {
+      for (yn2 in y2) {
+        if (yn2 == t$root_id) {
+          next
+        }
+        ev[[length(ev) + 1]] <- c(t$root_id, yn2)
+      }
+    }
+    if (length(ev) == 0) {
+      # both traits start at the root
+      ev[[length(ev) + 1]] <- c(t$root_id, t$root_id)
     }
   }
 
