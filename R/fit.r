@@ -80,83 +80,13 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
         )
         births[[i]] <- b
       }
-      b1 <- births[[1]]
-      b2 <- births[[2]]
 
-      root_prob <- root
-      y1 <- youngest[[1]]
-      y2 <- youngest[[2]]
-      if (root[1] > 0) {
-        # ancestral state is 00
-        # check is trait 1-1 can be born
-        if (y1[2] != b1$node) {
-          if (!is_parent(t, b1$node, y1[2])) {
-            # invalid root state
-            root_prob[1] <- 0
-          }
-        }
-        # check if trait 2-1 can be born
-        if (y2[2] != b2$node) {
-          if (!is_parent(t, b2$node, y2[2])) {
-            # invalid root state
-            root_prob[1] <- 0
-          }
-        }
-      }
-      if (root[2] > 0) {
-        # ancestral state is 01
-        # check is trait 1-1 can be born
-        if (y1[2] != b1$node) {
-          if (!is_parent(t, b1$node, y1[2])) {
-            # invalid root state
-            root_prob[2] <- 0
-          }
-        }
-        # check if trait 2-0 can be born
-        if (y2[1] != b2$node) {
-          if (!is_parent(t, b2$node, y2[1])) {
-            # invalid root state
-            root_prob[2] <- 0
-          }
-        }
-      }
-      if (root[3] > 0) {
-        # ancestral state is 10
-        # check is trait 1-0 can be born
-        if (y1[1] != b1$node) {
-          if (!is_parent(t, b1$node, y1[1])) {
-            # invalid root state
-            root_prob[3] <- 0
-          }
-        }
-        # check if trait 2-1 can be born
-        if (y2[2] != b2$node) {
-          if (!is_parent(t, b2$node, y2[2])) {
-            # invalid root state
-            root_prob[3] <- 0
-          }
-        }
-      }
-      if (root[4] > 0) {
-        # ancestral state is 11
-        # check is trait 1-0 can be born
-        if (y1[1] != b1$node) {
-          if (!is_parent(t, b1$node, y1[1])) {
-            # invalid root state
-            root_prob[4] <- 0
-          }
-        }
-        # check if trait 2-0 can be born
-        if (y2[1] != b2$node) {
-          if (!is_parent(t, b2$node, y2[1])) {
-            # invalid root state
-            root_prob[4] <- 0
-          }
-        }
-      }
+      # update root priors
+      root_prob <- update_root(t, root, births, youngest)
       if (all(root_prob == 0)) {
         return(Inf)
       }
+
       Q <- from_model_to_Q(mQ, p[3:length(p)])
       semi_Q <- Q
       lk <- sinba_like(
@@ -181,47 +111,7 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
   }
 
   # check all possible birth events
-  y1 <- youngest[[1]]
-  y2 <- youngest[[2]]
-  ev <- list()
-  for (yn1 in y1) {
-    if (yn1 == t$root_id) {
-      next
-    }
-    for (yn2 in y2) {
-      if (yn2 == t$root_id) {
-        next
-      }
-      if (yn1 != yn2) {
-        if (!is_parent(t, yn1, yn2) && !is_parent(t, yn2, yn1)) {
-          next
-        }
-      }
-      ev[[length(ev) + 1]] <- c(yn1, yn2)
-    }
-  }
-  if (length(ev) == 0) {
-    # at least one of the traits start at the root
-    if (any(y1 != t$root_id)) {
-      for (yn1 in y1) {
-        if (yn1 == t$root_id) {
-          next
-        }
-        ev[[length(ev) + 1]] <- c(yn1, t$root_id)
-      }
-    } else if (any(y2 != t$root_id)) {
-      for (yn2 in y2) {
-        if (yn2 == t$root_id) {
-          next
-        }
-        ev[[length(ev) + 1]] <- c(t$root_id, yn2)
-      }
-    }
-    if (length(ev) == 0) {
-      # both traits start at the root
-      ev[[length(ev) + 1]] <- c(t$root_id, t$root_id)
-    }
-  }
+  ev <- birth_events(t, youngest)
 
   res <- list(objective = Inf)
   for (i in sample(seq_len(length(ev)))) {

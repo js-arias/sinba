@@ -99,46 +99,6 @@ normalize_Q <- function(Q) {
   return(Q)
 }
 
-# scenario returns the trait activation scenario
-# given the root state
-# and the first active trait,
-scenario <- function(r, tr) {
-  if (r == 1) {
-    # root 00
-    if (tr == 1) {
-      # first trait active: 00 <-> 10
-      return("13")
-    }
-    # second trait active: 00 <-> 01
-    return("12")
-  }
-  if (r == 2) {
-    # root 01
-    if (tr == 1) {
-      # first trait active: 01 <-> 11
-      return("24")
-    }
-    # second trait active: 01 <-> 00
-    return("12")
-  }
-  if (r == 3) {
-    # root 10
-    if (tr == 1) {
-      # first trait active: 10 <-> 00
-      return("13")
-    }
-    # second trait active: 10 <-> 11
-    return("34")
-  }
-  # root 11
-  if (tr == 1) {
-    # first trait active: 11 <-> 01
-    return("24")
-  }
-  # second trait active: 11 <-> 10
-  return("34")
-}
-
 # semi_active_Q returns the semiactive Q
 # for a given scenario.
 semi_active_Q <- function(sc, Q) {
