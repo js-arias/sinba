@@ -225,6 +225,199 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 
 #' @export
 #' @title
+#' Maximum Likelihood Estimation of a Transition Matrix With Fixed Births
+#'
+#' @description
+#' `fit_fixed_births` searches for the maximum likelihood estimate
+#' of the transition matrix
+#' with the Sinba model with two traits
+#' with a fixed birth events.
+#'
+#' @param tree A phylogenetic tree of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+#' #' @param births A list with two element,
+#'   each element being a list that define a birth event,
+#'   with a fields `node` indicating the birth of the trait
+#'   and `age` indicating the time from the start of the edge
+#'   in which the event happens.
+#' @param model Model of evolution for the traits.
+#'   By default it uses the independent model ("IND").
+#'   Other valid values are "ARD"
+#'   or "xy" for a fully correlated model;
+#'   "ER" for a model in which both traits have equal rates
+#'   in any direction;
+#'   "ER2" for an equal rates model,
+#'   but rates are different for each trait;
+#'   "SYM" for the symmetric model
+#'   in which changes between states are equal;
+#'   "x" for a model in which trait x depends on y;
+#'   and "y" in which trait y depends on x.
+#' @param root Root prior probabilities.
+#'   By default,
+#'   all states will have the same probability.
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+fit_fixed_births <- function(
+    tree, data, births, model = "IND", root = NULL,
+    opts = NULL) {
+  if (!inherits(tree, "phylo")) {
+    stop("fit_fixed_births: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  cond <- init_conditionals(t, data, 2)
+
+  if (is.null(root)) {
+    root <- rep(1, ncol(cond))
+  }
+  if (length(root) != ncol(cond)) {
+    stop("fit_fixed_births: invalid size for `root` vector.")
+  }
+  root <- root / sum(root)
+
+  mQ <- model_matrix(model)
+  k <- max(mQ)
+
+  if (is.null(births)) {
+    stop("fit_fixed_births: undefined `births` events")
+  }
+  if (length(births) < 2) {
+    stop("fit_fixed_births: two events required in `births`")
+  }
+  for (i in 1:2) {
+    e <- births[[i]]
+    if (is.null(e$node)) {
+      stop(sprintf(
+        "fit_fixed_births: expecting field `node` in `births` event %d", i
+      ))
+    }
+    if (is.null(e$age)) {
+      stop(sprintf(
+        "fit_fixed_births: expecting field `age` in `births` event %d", i
+      ))
+    }
+    if (e$age > t$br_len[e$node]) {
+      stop(sprintf(
+        "fit_fixed_births: invalid value for field `age` in `births` event %d",
+        i
+      ))
+    }
+  }
+
+  # if events are not in the same root path
+  # the likelihood is 0.
+  b1 <- births[[1]]
+  b2 <- births[[2]]
+  if (b1$node != b2$node) {
+    if (!is_parent(t, b1$node, b2$node) && !(is_parent(t, b2$node, b1$node))) {
+      obj <- list(
+        logLik = -Inf,
+        k = k,
+        model = model,
+        Q = matrix(nrow = 4, ncol = 4),
+        births = births,
+        states = c("00", "01", "10", "11"),
+        root_prior = root,
+        data = data,
+        tree = tree
+      )
+      class(obj) <- "fit_sinba"
+      return(obj)
+    }
+  }
+
+  youngest <- youngest_birth_event(t, cond)
+
+  # check for valid events
+  root_prob <- update_root(t, root, births, youngest)
+
+  # if no birth sequence is compatible with birth events
+  # the likelihood is 0
+  if (all(root_prob == 0)) {
+    obj <- list(
+      logLik = -Inf,
+      k = k,
+      model = model,
+      Q = matrix(nrow = 4, ncol = 4),
+      births = births,
+      states = c("00", "01", "10", "11"),
+      root_prior = root,
+      data = data,
+      tree = tree
+    )
+    class(obj) <- "fit_sinba"
+    return(obj)
+  }
+
+  ev_prob <- 2 * log(prob_birth(t))
+
+  # closure for the likelihood function
+  like_func <- function() {
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+      if (any(p > 1000)) {
+        return(Inf)
+      }
+
+      Q <- from_model_to_Q(mQ, p)
+      semi_Q <- Q
+      lk <- sinba_like(
+        t, Q, semi_Q, births, xt, cond,
+        log(root_prob), ev_prob
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    v <- 1e-06
+    opts <- list(
+      "algorithm" = "NLOPT_LN_SBPLX",
+      # set the upper bound using the number of replicates
+      xtol_abs = rep(v, 3),
+      maxeval = 10000
+    )
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  fn <- like_func()
+  par <- c(runif(k))
+  res <- nloptr::nloptr(
+    x0 = par,
+    eval_f = fn,
+    opts = opts
+  )
+
+  q <- from_model_to_Q(mQ, res$solution)
+  q <- normalize_Q(q)
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    states = c("00", "01", "10", "11"),
+    root_prior = root,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
+}
+
+#' @export
+#' @title
 #' Estimate the Likelihood for a Given Sinba Transition Matrices in Two Traits
 #'
 #' @description
@@ -336,79 +529,10 @@ fixed_sinba <- function(
     }
   }
 
-  # check for valid events
-  root_prob <- root
   youngest <- youngest_birth_event(t, cond)
-  y1 <- youngest[[1]]
-  y2 <- youngest[[2]]
-  if (root[1] > 0) {
-    # ancestral state is 00
-    # check is trait 1-1 can be born
-    if (y1[2] != b1$node) {
-      if (!is_parent(t, b1$node, y1[2])) {
-        # invalid root state
-        root_prob[1] <- 0
-      }
-    }
-    # check if trait 2-1 can be born
-    if (y2[2] != b2$node) {
-      if (!is_parent(t, b2$node, y2[2])) {
-        # invalid root state
-        root_prob[1] <- 0
-      }
-    }
-  }
-  if (root[2] > 0) {
-    # ancestral state is 01
-    # check is trait 1-1 can be born
-    if (y1[2] != b1$node) {
-      if (!is_parent(t, b1$node, y1[2])) {
-        # invalid root state
-        root_prob[2] <- 0
-      }
-    }
-    # check if trait 2-0 can be born
-    if (y2[1] != b2$node) {
-      if (!is_parent(t, b2$node, y2[1])) {
-        # invalid root state
-        root_prob[2] <- 0
-      }
-    }
-  }
-  if (root[3] > 0) {
-    # ancestral state is 10
-    # check is trait 1-0 can be born
-    if (y1[1] != b1$node) {
-      if (!is_parent(t, b1$node, y1[1])) {
-        # invalid root state
-        root_prob[3] <- 0
-      }
-    }
-    # check if trait 2-1 can be born
-    if (y2[2] != b2$node) {
-      if (!is_parent(t, b2$node, y2[2])) {
-        # invalid root state
-        root_prob[3] <- 0
-      }
-    }
-  }
-  if (root[4] > 0) {
-    # ancestral state is 11
-    # check is trait 1-0 can be born
-    if (y1[1] != b1$node) {
-      if (!is_parent(t, b1$node, y1[1])) {
-        # invalid root state
-        root_prob[4] <- 0
-      }
-    }
-    # check if trait 2-0 can be born
-    if (y2[1] != b2$node) {
-      if (!is_parent(t, b2$node, y2[1])) {
-        # invalid root state
-        root_prob[4] <- 0
-      }
-    }
-  }
+
+  # check for valid events
+  root_prob <- update_root(t, root, births, youngest)
 
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
