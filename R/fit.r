@@ -50,6 +50,13 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
   }
   root <- root / sum(root)
 
+  if (model == "x" || model == "y") {
+    obj <- sinba_corr(t, cond, model, root, opts)
+    obj$data <- data
+    obj$tree <- tree
+    return(obj)
+  }
+
   mQ <- model_matrix(model)
   k <- max(mQ) + 2
 
@@ -359,6 +366,83 @@ fit_fixed_births <- function(
     )
     class(obj) <- "fit_sinba"
     return(obj)
+  }
+
+  # if birth sequence is not compatible with the model
+  # the likelihood is 0
+  if (model == "x") {
+    # the first trait is the dependant trait
+    # so it must born after second trait
+    if (b1$node == b2$node) {
+      if (b1$age < b2$age) {
+        obj <- list(
+          logLik = -Inf,
+          k = k,
+          model = model,
+          Q = matrix(nrow = 4, ncol = 4),
+          births = births,
+          states = c("00", "01", "10", "11"),
+          root_prior = root,
+          data = data,
+          tree = tree
+        )
+        class(obj) <- "fit_sinba"
+        return(obj)
+      }
+    } else {
+      if (t$age[b1$node] < t$age[b2$node]) {
+        obj <- list(
+          logLik = -Inf,
+          k = k,
+          model = model,
+          Q = matrix(nrow = 4, ncol = 4),
+          births = births,
+          states = c("00", "01", "10", "11"),
+          root_prior = root,
+          data = data,
+          tree = tree
+        )
+        class(obj) <- "fit_sinba"
+        return(obj)
+      }
+    }
+  }
+  if (model == "y") {
+    # the second trait is the dependant trait
+    # so it must born after first trait
+    if (b1$node == b2$node) {
+      if (b2$age < b1$age) {
+        obj <- list(
+          logLik = -Inf,
+          k = k,
+          model = model,
+          Q = matrix(nrow = 4, ncol = 4),
+          births = births,
+          states = c("00", "01", "10", "11"),
+          root_prior = root,
+          data = data,
+          tree = tree
+        )
+        class(obj) <- "fit_sinba"
+        return(obj)
+      }
+    } else {
+      if (t$age[b2$node] < t$age[b1$node]) {
+        obj <- list(
+          logLik = -Inf,
+          k = k,
+          model = model,
+          Q = matrix(nrow = 4, ncol = 4),
+          births = births,
+          states = c("00", "01", "10", "11"),
+          root_prior = root,
+          data = data,
+          tree = tree
+        )
+        class(obj) <- "fit_sinba"
+        return(obj)
+      }
+    }
   }
 
   ev_prob <- 2 * log(prob_birth(t))
@@ -790,6 +874,150 @@ print.fixed_sinba <- function(x, digits = 6, ...) {
   root <- x$root_prior
   names(root) <- x$states
   print(root)
+}
+
+# sinba_corr makes the maximum likelihood estimation
+# of a correlated model.
+sinba_corr <- function(t, cond, model, root, opts) {
+  mQ <- model_matrix(model)
+  k <- max(mQ) + 2
+
+  youngest <- youngest_birth_event(t, cond)
+  ev_prob <- 2 * log(prob_birth(t))
+
+  # closure for the likelihood function
+  like_func <- function(yn, m) {
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+      if (any(p[3:length(p)] > 1000)) {
+        return(Inf)
+      }
+
+      # check that births are in agreement with the model
+      if (m == "x") {
+        # the first trait is the dependent trait
+        # so it must born after the second trait
+        if (p[1] < p[2]) {
+          return(Inf)
+        }
+      }
+      if (m == "y") {
+        # the second trait is the dependent trait
+        # so it must born after the first trait
+        if (p[2] < p[1]) {
+          return(Inf)
+        }
+      }
+
+      births <- list()
+      for (i in 1:2) {
+        n <- get_node_by_len(t, p[i], yn[i])
+        if (n <= 0) {
+          return(Inf)
+        }
+        b <- list(
+          node = n,
+          age = t$br_len[n] + p[i] - t$age[n]
+        )
+        births[[i]] <- b
+      }
+
+      # update root priors
+      root_prob <- update_root(t, root, births, youngest)
+      if (all(root_prob == 0)) {
+        return(Inf)
+      }
+
+      Q <- from_model_to_Q(mQ, p[3:length(p)])
+      semi_Q <- Q
+      lk <- sinba_like(
+        t, Q, semi_Q, births, xt, cond,
+        log(root_prob), ev_prob
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    v <- 1e-06
+    opts <- list(
+      "algorithm" = "NLOPT_LN_SBPLX",
+      # set the upper bound using the number of replicates
+      xtol_abs = rep(v, 3),
+      maxeval = 10000
+    )
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  # check all possible birth events
+  ev <- birth_events(t, youngest)
+
+  res <- list(objective = Inf)
+  for (i in sample(seq_len(length(ev)))) {
+    e <- ev[[i]]
+    # check if events are consistent with the model constraint
+    if (model == "x") {
+      # the first trait is the dependent trait
+      # so it must born after the second trait
+      if (t$age[e[1]] < t$age[e[2]]) {
+        e[2] <- e[1]
+      }
+    }
+    if (model == "y") {
+      # the second trait is the dependent trait
+      # so it must born after the first trait
+      if (t$age[e[2]] < t$age[e[1]]) {
+        e[1] <- e[2]
+      }
+    }
+
+    fn <- like_func(e, model)
+    par <- c(
+      runif(1, max = t$age[e[1]]),
+      runif(1, max = t$age[e[2]]), runif(k - 2)
+    )
+    r <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    if (r$objective < res$objective) {
+      res <- r
+      res$ev_nodes <- e
+    }
+  }
+
+  q <- from_model_to_Q(mQ, res$solution[3:length(res$solution)])
+  q <- normalize_Q(q)
+  births <- list()
+  for (i in 1:2) {
+    n <- get_node_by_len(t, res$solution[i], res$ev_node[i])
+    if (n <= 0) {
+      return(Inf)
+    }
+    b <- list(
+      node = n,
+      age = t$br_len[n] + res$solution[i] - t$age[n]
+    )
+    births[[i]] <- b
+  }
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    states = c("00", "01", "10", "11"),
+    root_prior = root
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
 }
 
 # sinba_like calculates the likelihood
