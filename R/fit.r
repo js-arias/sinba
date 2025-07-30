@@ -36,7 +36,7 @@
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
   if (!inherits(tree, "phylo")) {
-    stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
+    stop("fit_sinba: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
@@ -46,12 +46,12 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
     root <- rep(1, ncol(cond))
   }
   if (length(root) != ncol(cond)) {
-    stop("fixed_sinba: invalid size for `root` vector.")
+    stop("fit_sinba: invalid size for `root` vector.")
   }
   root <- root / sum(root)
 
   if (model == "x" || model == "y") {
-    obj <- sinba_corr(t, cond, model, root, opts)
+    obj <- sinba_dep(t, cond, model, root, opts)
     obj$data <- data
     obj$tree <- tree
     return(obj)
@@ -538,7 +538,7 @@ fit_fixed_matrix <- function(
     tree, data, rate_mat, semi_mat = NULL,
     root = NULL, opts = NULL) {
   if (!inherits(tree, "phylo")) {
-    stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
+    stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
@@ -548,28 +548,28 @@ fit_fixed_matrix <- function(
     root <- rep(1, ncol(cond))
   }
   if (length(root) != ncol(cond)) {
-    stop("fixed_sinba: invalid size for `root` vector.")
+    stop("fit_fixed_matrix: invalid size for `root` vector.")
   }
   root <- root / sum(root)
 
   if (is.null(rate_mat)) {
-    stop("fixed_sinba: `rate_mat` must be a matrix")
+    stop("fit_fixed_matrix: `rate_mat` must be a matrix")
   }
   if (nrow(rate_mat) != ncol(rate_mat)) {
-    stop("fixed_sinba: `rate_mat` must be a square matrix")
+    stop("fit_fixed_matrix: `rate_mat` must be a square matrix")
   }
   if (nrow(rate_mat) != 4) {
-    stop("fixed_sinba: `rate_mat` should be 4x4")
+    stop("fit_fixed_matrix: `rate_mat` should be 4x4")
   }
 
   if (is.null(semi_mat)) {
     semi_mat <- rate_mat
   }
   if (nrow(semi_mat) != ncol(semi_mat)) {
-    stop("fixed_sinba: `semi_mat` must be a square matrix")
+    stop("fit_fixed_matrix: `semi_mat` must be a square matrix")
   }
   if (nrow(semi_mat) != 4) {
-    stop("fixed_sinba: `semi_mat` should be 4x4")
+    stop("fit_fixed_matrix: `semi_mat` should be 4x4")
   }
 
   k <- 2
@@ -876,9 +876,9 @@ print.fixed_sinba <- function(x, digits = 6, ...) {
   print(root)
 }
 
-# sinba_corr makes the maximum likelihood estimation
-# of a correlated model.
-sinba_corr <- function(t, cond, model, root, opts) {
+# sinba_dep makes the maximum likelihood estimation
+# of dependant models.
+sinba_dep <- function(t, cond, model, root, opts) {
   mQ <- model_matrix(model)
   k <- max(mQ) + 2
 
