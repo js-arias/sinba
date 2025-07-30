@@ -217,6 +217,13 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   rownames(Q) <- x$states
   colnames(Q) <- x$states
   print(Q)
+  if (!is.null(x$semi_Q)) {
+    cat("Semi-active process:\n")
+    sQ <- x$semi_Q
+    rownames(sQ) <- x$states
+    colnames(sQ) <- x$states
+    print(sQ)
+  }
   cat("Root prior:\n")
   root <- x$root_prior
   names(root) <- x$states
@@ -228,7 +235,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #' Maximum Likelihood Estimation of a Transition Matrix With Fixed Births
 #'
 #' @description
-#' `fit_fixed_births` searches for the maximum likelihood estimate
+#' `fit_fixed_births()` searches for the maximum likelihood estimate
 #' of the transition matrix
 #' with the Sinba model with two traits
 #' with a fixed birth events.
@@ -239,7 +246,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #'   The second and third column contains the data,
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
-#' #' @param births A list with two element,
+#' @param births A list with two element,
 #'   each element being a list that define a birth event,
 #'   with a fields `node` indicating the birth of the trait
 #'   and `age` indicating the time from the start of the edge
@@ -406,6 +413,177 @@ fit_fixed_births <- function(
     k = k,
     model = model,
     Q = q,
+    births = births,
+    states = c("00", "01", "10", "11"),
+    root_prior = root,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
+}
+
+#' @export
+#' @title
+#' Maximum Likelihood Estimation of Births With Fixed Transition Matrix
+#'
+#' @description
+#' `fit_fixed_matrix()` searches for the maximum likelihood estimate
+#' of birth events of two traits
+#' given a transition matrix
+#' under the Sinba model.
+#'
+#' @param tree A phylogenetic tree of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+#' @param rate_mat Rate matrix for the traits with the full process.
+#' @param semi_mat Rate matrix for the traits with the semi-active process.
+#'   If it is NULL,
+#'   it will use the same parameter values
+#'   from the full process.
+#' @param root Root prior probabilities.
+#'   By default,
+#'   all states will have the same probability.
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+fit_fixed_matrix <- function(
+    tree, data, rate_mat, semi_mat = NULL,
+    root = NULL, opts = NULL) {
+  if (!inherits(tree, "phylo")) {
+    stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  cond <- init_conditionals(t, data, 2)
+
+  if (is.null(root)) {
+    root <- rep(1, ncol(cond))
+  }
+  if (length(root) != ncol(cond)) {
+    stop("fixed_sinba: invalid size for `root` vector.")
+  }
+  root <- root / sum(root)
+
+  if (is.null(rate_mat)) {
+    stop("fixed_sinba: `rate_mat` must be a matrix")
+  }
+  if (nrow(rate_mat) != ncol(rate_mat)) {
+    stop("fixed_sinba: `rate_mat` must be a square matrix")
+  }
+  if (nrow(rate_mat) != 4) {
+    stop("fixed_sinba: `rate_mat` should be 4x4")
+  }
+
+  if (is.null(semi_mat)) {
+    semi_mat <- rate_mat
+  }
+  if (nrow(semi_mat) != ncol(semi_mat)) {
+    stop("fixed_sinba: `semi_mat` must be a square matrix")
+  }
+  if (nrow(semi_mat) != 4) {
+    stop("fixed_sinba: `semi_mat` should be 4x4")
+  }
+
+  k <- 2
+
+  youngest <- youngest_birth_event(t, cond)
+  ev_prob <- 2 * log(prob_birth(t))
+
+  # closure for the likelihood function
+  like_func <- function(yn) {
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+
+      births <- list()
+      for (i in 1:2) {
+        n <- get_node_by_len(t, p[i], yn[i])
+        if (n <= 0) {
+          return(Inf)
+        }
+        b <- list(
+          node = n,
+          age = t$br_len[n] + p[i] - t$age[n]
+        )
+        births[[i]] <- b
+      }
+
+      # update root priors
+      root_prob <- update_root(t, root, births, youngest)
+      if (all(root_prob == 0)) {
+        return(Inf)
+      }
+
+      lk <- sinba_like(
+        t, rate_mat, semi_mat, births, xt, cond,
+        log(root_prob), ev_prob
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    v <- 1e-06
+    opts <- list(
+      "algorithm" = "NLOPT_LN_SBPLX",
+      # set the upper bound using the number of replicates
+      xtol_abs = rep(v, 3),
+      maxeval = 10000
+    )
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  # check all possible birth events
+  ev <- birth_events(t, youngest)
+
+  res <- list(objective = Inf)
+  for (i in sample(seq_len(length(ev)))) {
+    e <- ev[[i]]
+    fn <- like_func(e)
+    par <- c(
+      runif(1, max = t$age[e[1]]),
+      runif(1, max = t$age[e[2]]), runif(k - 2)
+    )
+    r <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    if (r$objective < res$objective) {
+      res <- r
+      res$ev_nodes <- e
+    }
+  }
+
+  q <- normalize_Q(rate_mat)
+  sq <- normalize_Q(semi_mat)
+  births <- list()
+  for (i in 1:2) {
+    n <- get_node_by_len(t, res$solution[i], res$ev_node[i])
+    if (n <= 0) {
+      return(Inf)
+    }
+    b <- list(
+      node = n,
+      age = t$br_len[n] + res$solution[i] - t$age[n]
+    )
+    births[[i]] <- b
+  }
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = "fixed",
+    Q = q,
+    semi_Q = sq,
     births = births,
     states = c("00", "01", "10", "11"),
     root_prior = root,

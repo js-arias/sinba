@@ -13,8 +13,9 @@ fit_fixed_births(tree, data, births, model = "IND", root = NULL, opts = NULL)
 The first column should contain the taxon names,
 The second and third column contains the data,
 coded as 0 and 1.
-Any other column will be ignored.
-#' @param births A list with two element,
+Any other column will be ignored.}
+
+\item{births}{A list with two element,
 each element being a list that define a birth event,
 with a fields \code{node} indicating the birth of the trait
 and \code{age} indicating the time from the start of the edge
@@ -42,7 +43,7 @@ with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
 }
 \description{
-\code{fit_fixed_births} searches for the maximum likelihood estimate
+\code{fit_fixed_births()} searches for the maximum likelihood estimate
 of the transition matrix
 with the Sinba model with two traits
 with a fixed birth events.
