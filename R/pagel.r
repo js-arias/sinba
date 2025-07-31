@@ -1,19 +1,20 @@
-#' @import stats
-#' @import nloptr
-#'
 #' @export
-#' @title Maximum Likelihood Estimation of the Pagel's model
+#' @title
+#' Maximum Likelihood Estimation of the Pagel's Model Under the Sinba Model
 #'
 #' @description
 #' `fit_pagel()` searches for the maximum likelihood estimate
 #' of a given model for two traits
 #' using the Pagel (1994) model.
+#' It is a wrapper of `fit_fixed_births()`
+#' with the births at the root.
 #'
 #' @param tree A phylogenetic tree of class "phylo".
-#' @param x A vector of phenotypic values for a binary trait
-#'   for the tips in `tree`.
-#' @param y A vector of phenotypic values for a binary trait
-#'   for the tips in `tree`.
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
 #' @param model Model of evolution for the traits.
 #'   By default it uses the independent model.
 #'   Other valid values are "ARD"
@@ -26,218 +27,23 @@
 #'   in which changes between states are equal;
 #'   "x" for a model in which trait x depends on y;
 #'   and "y" in which trait y depends on x.
-#' @param fixed Use a transition matrix with fixed values.
+#' @param root Root prior probabilities.
+#'   By default,
+#'   all states will have the same probability.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
-#'
-#' @return An object of class "fit_pagel",
-#'   or,
-#'   if a `fixed` Q matrix is defined,
-#'   an object of class "fixed_pagel".
-fit_pagel <- function(tree, x, y, model = "IND", fixed = NULL, opts = NULL) {
-  if (!inherits(tree, "phylo")) {
-    stop("fit_pagel: `tree` must be an object of class \"phylo\".")
-  }
-
-  if (!is.factor(x)) {
-    x <- as.factor(x)
-  }
-  x_levels <- levels(x)
-  if (!is.factor(y)) {
-    y <- as.factor(y)
-  }
-  y_levels <- levels(y)
-  if (length(x_levels) != 2 || length(y_levels) != 2) {
-    stop("fit_pagel: `x` and `y` must be binary traits.")
-  }
-  xy <- stats::setNames(
-    factor(paste(x, y, sep = "|"),
-      levels = sapply(x_levels, paste, y_levels, sep = "|")
-    ),
-    names(x)
-  )
-  xy_levels <- levels(xy)
-
-  if (!is.null(fixed)) {
-    if (nrow(fixed) != ncol(fixed)) {
-      stop("fit_pagel: `fixed` must be an square matrix.")
-    }
-    if (nrow(fixed) != 4) {
-      stop("fit_pagel: `fixed` must be an square matrix.")
-    }
-    rownames(fixed) <- xy_levels
-    colnames(fixed) <- xy_levels
-
-    xt <- tree_to_cpp(tree)
-    cond <- init_tree_conditionals(tree, xy)
-
-    l <- pagel_like(tree, fixed, xt, cond)
-
-    pi <- rep(0.25, 4)
-    names(pi) <- xy_levels
-    obj <- list(
-      logLik = l,
-      Q = normalize_Q(fixed),
-      states = xy_levels,
-      pi = pi,
-      root.prior = "flat",
-      data = xy,
-      tree = tree
+fit_pagel <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
+  root_id <- length(tree$tip.label) + 1
+  births <- list()
+  for (i in 1:2) {
+    b <- list(
+      node = root_id,
+      age = 0
     )
-    class(obj) <- "fixed_pagel"
-    return(obj)
+    births[[i]] <- b
   }
-
-  mQ <- model_matrix(model)
-  k <- max(mQ)
-  rownames(mQ) <- xy_levels
-  colnames(mQ) <- xy_levels
-
-  if (is.null(opts)) {
-    v <- 1e-04
-    opts <- list(
-      "algorithm" = "NLOPT_LN_SBPLX",
-      # set the upper bound using the number of replicates
-      xtol_abs = rep(v, max(mQ)),
-      maxeval = 10000
-    )
-  }
-  if (is.null(opts$algorithm)) {
-    opts$algorithm <- "NLOPT_LN_SBPLX"
-  }
-
-  # the upper bound is a change per branch
-  upper <- length(tree$edge) / sum(tree$edge.length)
-
-  # closure for the nloptr function
-  like_func <- function(t, d, m) {
-    xt <- tree_to_cpp(t)
-    cond <- init_tree_conditionals(t, d)
-
-    return(function(p) {
-      if (any(p < 0)) {
-        return(Inf)
-      }
-      if (any(p > upper)) {
-        return(Inf)
-      }
-
-      Q <- from_model_to_Q(m, p)
-      l <- pagel_like(t, Q, xt, cond)
-      return(-l)
-    })
-  }
-  fn <- like_func(tree, xy, mQ)
-
-  best <- list()
-
-  # for the equal rates model use Brent
-  if (max(mQ) == 1) {
-    par <- stats::runif(1, max = upper)
-    best <- stats::optim(par, fn,
-      method = "Brent", lower = 0, upper = upper
-    )
-  } else {
-    # initial guess using an equal rates model
-    erm <- model_matrix("ER")
-    erf <- like_func(tree, xy, erm)
-    ep <- stats::runif(1, max = upper)
-    best <- stats::optim(ep, erf,
-      method = "Brent", lower = 0, upper = upper
-    )
-
-    par <- rep(best$par[1], max(mQ))
-    res <- nloptr::nloptr(
-      x0 = par,
-      eval_f = fn,
-      opts = opts
-    )
-    best$par <- res$solution
-    best$value <- res$objective
-  }
-  q <- from_model_to_Q(mQ, best$par)
-  q <- normalize_Q(q)
-  rownames(q) <- xy_levels
-  colnames(q) <- xy_levels
-  pi <- rep(0.25, 4)
-  names(pi) <- xy_levels
-  obj <- list(
-    logLik = -best$value,
-    model = model,
-    k = k,
-    rates = best$par,
-    index.matrix = mQ,
-    Q = q,
-    states = xy_levels,
-    pi = pi,
-    root.prior = "flat",
-    data = xy,
-    tree = tree
-  )
-  class(obj) <- "fit_pagel"
+  obj <- fit_fixed_births(tree, data, births, model, root, opts)
+  obj$model <- sprintf("Pagel + %s", model)
   return(obj)
-}
-
-#' @export
-#' @title Extract Log-Likelihood From a "fit_pagel" Object
-#'
-#' @description
-#' This method implements the `logLik` method
-#' on a "fit_pagel" object.
-#'
-#' @param object An object of type "fit_pagel".
-#' @param ... Additional arguments are unused.
-logLik.fit_pagel <- function(object, ...) {
-  l <- object$logLik
-  attr(l, "df") <- object$k
-  attr(l, "nobs") <- length(object$data)
-  class(l) <- "logLik"
-  return(l)
-}
-
-#' @export
-#' @title Basic Print For a "fit_pagel" Object
-#'
-#' @description
-#' This method implements the `print` method
-#' on a `fit_pagel` object.
-#'
-#' @param x An of type "fit_pagel".
-#' @param digits The number of digits for decimal output.
-#' @param ... Additional arguments are unused.
-print.fit_pagel <- function(x, digits = 6, ...) {
-  cat("Object of class \"fit_pagel\".\n\n")
-  cat("Fitted value of Q:\n")
-  print(x$Q)
-  cat("\nSet value of pi:\n")
-  print(x$pi)
-  cat(paste("\nLog-likelihood = ", round(x$logLik, digits), ".\n",
-    sep = ""
-  ))
-  cat(paste("Model: ", x$model, ".\n", sep = ""))
-  aic <- 2 * x$k - 2 * x$logLik
-  cat(paste("AIC  = ", round(aic, digits), ".\n", sep = ""))
-  aicc <- aic + (2 * x$k * x$k + 2 * x$k) / (length(x$data) - x$k - 1)
-  cat(paste("AICc = ", round(aicc, digits), ".\n", sep = ""))
-  cat(paste("Free parameters = ", x$k, ".\n", sep = ""))
-}
-
-# pagel_like calculates the likelihood
-# of a Pagel's model.
-pagel_like <- function(t, Q, xt, cond) {
-  # make sure that Q matrix is valid
-  Q[1, 4] <- 0
-  Q[2, 3] <- 0
-  Q[3, 2] <- 0
-  Q[4, 1] <- 0
-  Q <- normalize_Q(Q)
-
-  root_id <- length(t$tip.label) + 1
-
-  l <- full_conditionals(xt$parent, xt$nodes, xt$branch, cond, Q)
-
-  mx <- max(l[root_id, ])
-  like <- log(sum(exp(l[root_id, ] - mx))) + mx + log(0.25)
-  return(like)
 }

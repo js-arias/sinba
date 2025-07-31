@@ -2,18 +2,18 @@
 % Please edit documentation in R/pagel.r
 \name{fit_pagel}
 \alias{fit_pagel}
-\title{Maximum Likelihood Estimation of the Pagel's model}
+\title{Maximum Likelihood Estimation of the Pagel's Model Under the Sinba Model}
 \usage{
-fit_pagel(tree, x, y, model = "IND", fixed = NULL, opts = NULL)
+fit_pagel(tree, data, model = "IND", root = NULL, opts = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
 
-\item{x}{A vector of phenotypic values for a binary trait
-for the tips in \code{tree}.}
-
-\item{y}{A vector of phenotypic values for a binary trait
-for the tips in \code{tree}.}
+\item{data}{A data frame with the data.
+The first column should contain the taxon names,
+The second and third column contains the data,
+coded as 0 and 1.
+Any other column will be ignored.}
 
 \item{model}{Model of evolution for the traits.
 By default it uses the independent model.
@@ -28,20 +28,18 @@ in which changes between states are equal;
 "x" for a model in which trait x depends on y;
 and "y" in which trait y depends on x.}
 
-\item{fixed}{Use a transition matrix with fixed values.}
+\item{root}{Root prior probabilities.
+By default,
+all states will have the same probability.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
 }
-\value{
-An object of class "fit_pagel",
-or,
-if a \code{fixed} Q matrix is defined,
-an object of class "fixed_pagel".
-}
 \description{
 \code{fit_pagel()} searches for the maximum likelihood estimate
 of a given model for two traits
 using the Pagel (1994) model.
+It is a wrapper of \code{fit_fixed_births()}
+with the births at the root.
 }
