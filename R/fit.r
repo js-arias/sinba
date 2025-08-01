@@ -220,9 +220,9 @@ print.fit_sinba <- function(x, digits = 6, ...) {
     b1$node, " time ", round(b1$age, digits), "\n",
     sep = ""
   ))
-  b3 <- x$births[[2]]
+  b2 <- x$births[[2]]
   cat(paste("- Trait ", n[3], " Node ",
-    b3$node, " time ", round(b3$age, digits), "\n",
+    b2$node, " time ", round(b2$age, digits), "\n",
     sep = ""
   ))
   cat("Rates:\n")
@@ -230,12 +230,46 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   rownames(Q) <- x$states
   colnames(Q) <- x$states
   print(Q)
-  if (!is.null(x$semi_Q)) {
+  age1 <- phylo_node_age(x$tree, b1$node)
+  age2 <- phylo_node_age(x$tree, b2$node)
+  if (b1$node == b2$node) {
+    age1 <- b1$age
+    age2 <- b2$age
+  }
+  if (age1 != age2) {
     cat("Semi-active process:\n")
-    sQ <- x$semi_Q
-    rownames(sQ) <- x$states
-    colnames(sQ) <- x$states
-    print(sQ)
+    sQ <- x$Q
+    if (!is.null(x$semi_Q)) {
+      sQ <- x$semi_Q
+    }
+    semi <- matrix(0, nrow = 2, ncol = 2)
+    if (age1 < age2) {
+      # first trait born first
+      semi[1, 2] <- sQ[1, 3]
+      if (sQ[1, 3] == 0) {
+        semi[1, 2] <- sQ[2, 4]
+      }
+      semi[2, 1] <- sQ[3, 1]
+      if (sQ[3, 1] == 0) {
+        semi[2, 1] <- sQ[4, 2]
+      }
+      rownames(semi) <- c("0*", "1*")
+      colnames(semi) <- c("0*", "1*")
+    } else {
+      # second trait born first
+      semi[1, 2] <- sQ[1, 2]
+      if (sQ[1, 2] == 0) {
+        semi[1, 2] <- sQ[3, 4]
+      }
+      semi[2, 1] <- sQ[2, 1]
+      if (sQ[2, 1] == 0) {
+        semi[2, 1] <- sQ[4, 3]
+      }
+      rownames(semi) <- c("*0", "*1")
+      colnames(semi) <- c("*0", "*1")
+    }
+    semi <- normalize_Q(semi)
+    print(semi)
   }
   cat("Root prior:\n")
   root <- x$root_prior

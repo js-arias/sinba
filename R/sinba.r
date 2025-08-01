@@ -1,18 +1,3 @@
-# node_age returns the elapsed time
-# since the root time.
-node_age <- function(t, n) {
-  s <- 0
-  while (TRUE) {
-    e <- which(t$edge[, 2] == n)
-    if (length(e) == 0) {
-      break
-    }
-    s <- s + t$edge.length[e]
-    n <- t$edge[e, 1]
-  }
-  return(s)
-}
-
 # path_to_node returns the path from the root
 # to a given node.
 path_to_node <- function(t, n) {

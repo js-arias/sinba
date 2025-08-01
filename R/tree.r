@@ -1,3 +1,19 @@
+# phylo_node_age returns the age of a node
+# in an ape tree
+# (an object of class "phylo").
+phylo_node_age <- function(phy, n) {
+  s <- 0
+  while (TRUE) {
+    e <- which(phy$edge[, 2] == n)
+    if (length(e) == 0) {
+      break
+    }
+    s <- s + phy$edge.length[e]
+    n <- phy$edge[e, 1]
+  }
+  return(s)
+}
+
 # phylo_to_sinba transforms an ape tree
 # (an object of class "phylo")
 # into a tree used for most internal functions
