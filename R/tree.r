@@ -65,6 +65,22 @@ is_parent <- function(t, p, n) {
   return(FALSE)
 }
 
+# node_size returns the number of terminals
+# for a given node.
+node_size <- function(t, n) {
+  if (n < t$root_id) {
+    # a tip
+    return(1)
+  }
+  sum <- 0
+  for (x in seq_len(length(t$tip))) {
+    if (is_parent(t, n, x)) {
+      sum <- sum + 1
+    }
+  }
+  return(sum)
+}
+
 # get_node_by_len returns a node
 # at a given "age" l (length from the root),
 # in the path between n and the root.
@@ -81,6 +97,21 @@ get_node_by_len <- function(t, l, n) {
   }
   return(t$root_id)
 }
+
+# path_to_node returns the path from the root
+# to a given node.
+path_to_node <- function(t, n) {
+  x <- c()
+  while (TRUE) {
+    x <- c(n, x)
+    if (n == t$root_id) {
+      break()
+    }
+    n <- t$parent[n]
+  }
+  return(x)
+}
+
 
 # prob_birth returns the probability of a birth event.
 prob_birth <- function(t) {

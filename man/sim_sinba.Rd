@@ -4,12 +4,14 @@
 \alias{sim_sinba}
 \title{Simulate A Pair of Traits Under the Sinba Model}
 \usage{
-sim_sinba(tree, Q, births = NULL)
+sim_sinba(tree, rate_mat, semi_mat = NULL, births = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
 
-\item{Q}{Transition matrix for simulation.}
+\item{rate_mat}{Rate matrix for the traits with the full process.}
+
+\item{semi_mat}{Rate matrix for the traits with the semi-active process.}
 
 \item{births}{A list with the two birth events.
 Each element of the list must contain the field
@@ -27,10 +29,10 @@ a random pair of birth events will be selected.}
 }
 \value{
 A list with the tree,
-births,
-and Q matrix used for the simulation,
-and factors x and y
-with the simulated states on the tips.
+a data frame with the data,
+the births,
+and the Q and semi-active
+matrices used for the simulation.
 }
 \description{
 \code{sim_sinba} simulates a pair of traits
