@@ -10,6 +10,9 @@
 #' and a pair of birth events.
 #'
 #' @param tree A phylogenetic tree of class "phylo".
+#' @param scenario A predefined scenario.
+#'   Valid values are:
+#'     "darwin": for the Darwin´s scenario.
 #' @param rate_mat Rate matrix for the traits with the full process.
 #' @param semi_mat Rate matrix for the traits with the semi-active process.
 #' @param births A list with the two birth events.
@@ -31,10 +34,17 @@
 #'   the births,
 #'   and the Q and semi-active
 #'   matrices used for the simulation.
-sim_sinba <- function(tree, rate_mat, semi_mat = NULL, births = NULL) {
+sim_sinba <- function(
+    tree, rate_mat = NULL, semi_mat = NULL, births = NULL,
+    scenario = "") {
   if (!inherits(tree, "phylo")) {
     stop("sim_sinba: `tree` must be an object of class \"phylo\".")
   }
+
+  if (scenario == "darwin") {
+    return(darwin_scenario(tree, births))
+  }
+
   t <- phylo_to_sinba(tree)
 
   if (is.null(rate_mat)) {
@@ -59,8 +69,8 @@ sim_sinba <- function(tree, rate_mat, semi_mat = NULL, births = NULL) {
   semi_mat <- normalize_Q(semi_active_Q("12", semi_mat))
 
   if (is.null(births)) {
-    max_size <- length(t$parent) * 0.75
-    min_size <- length(t$parent) * 0.25
+    max_size <- length(t$tip) * 0.75
+    min_size <- length(t$tip) * 0.25
     n2 <- 0
     while (TRUE) {
       n2 <- sample(seq_len(length(t$parent)), size = 1)
@@ -185,4 +195,42 @@ sim_evolution <- function(Q, len, s) {
     s <- nx
   }
   return(s)
+}
+
+darwin_scenario <- function(tree, births) {
+  t <- phylo_to_sinba(tree)
+  if (is.null(births)) {
+    max_size <- length(t$tip) * 0.75
+    min_size <- length(t$tip) * 0.25
+    n1 <- 0
+    while (TRUE) {
+      n1 <- sample(seq_len(length(t$parent)), size = 1)
+      sz <- node_size(t, n1)
+      if (sz > min_size && sz <= max_size) {
+        break
+      }
+    }
+    births[[1]] <- list(node = n1)
+    births[[2]] <- list(node = n1)
+  }
+  if (length(births) < 2) {
+    stop("sim_sinba: `births` should have at least two elements")
+  }
+  n <- births[[1]]$node
+
+  x <- rep(0, length(t$tip))
+  y <- rep(0, length(t$tip))
+  for (i in seq_len(length(t$tip))) {
+    if (!is_parent(t, n, i)) {
+      next
+    }
+    x[i] <- 1
+    y[i] <- 1
+  }
+
+  return(list(
+    tree = tree,
+    data = data.frame(t$tip, x, y),
+    births = births
+  ))
 }
