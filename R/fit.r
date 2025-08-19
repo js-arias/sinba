@@ -18,8 +18,22 @@
 #'   Any other column will be ignored.
 #' @param model Model of evolution for the traits.
 #'   By default it uses the independent model ("IND").
-#'   Other valid values are "ARD"
-#'   or "xy" for a fully correlated model;
+#'   There are three models, in which both traits are correlated,
+#'   the "DEP", the "xy", and the "ARD" model.
+#'   In the "DEP" model,
+#'   the rates of the semiactive process are taken
+#'   from the full process Q matrix,
+#'   In the "xy" it is assumed that the process for both traits
+#'   start simultaneously,
+#'   so there is no semi-active process,
+#'   and only a single birth.
+#'   In the "ARD" model,
+#'   the rates of the semiactive process
+#'   are also free parameters
+#'   (in all other model,
+#'   the parameters of the semi-active process
+#'   are taken from the full process).
+#'   Other models are,
 #'   "ER" for a model in which both traits have equal rates
 #'   in any direction;
 #'   "ER2" for an equal rates model,

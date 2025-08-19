@@ -27,7 +27,7 @@ model_matrix <- function(model = "") {
       0, 3, 4, 0
     ), nrow = 4, byrow = TRUE))
   }
-  if ((model == "xy") || (model == "ARD")) {
+  if ((model == "xy") || (model == "ARD") || (model == "DEP")) {
     # correlated model
     return(matrix(c(
       0, 1, 2, 0,
