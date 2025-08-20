@@ -13,6 +13,7 @@
 #' @param scenario A predefined scenario.
 #'   Valid values are:
 #'     "darwin": for the Darwin´s scenario.
+#'     "unrep":  for the Unreplicated burst scenario.
 #' @param rate_mat Rate matrix for the traits with the full process.
 #' @param semi_mat Rate matrix for the traits with the semi-active process.
 #' @param births A list with the two birth events.
@@ -43,6 +44,9 @@ sim_sinba <- function(
 
   if (scenario == "darwin") {
     return(darwin_scenario(tree, births))
+  }
+  if (scenario == "unrep") {
+    return(unreplicated_burst_scenario(tree, births))
   }
 
   t <- phylo_to_sinba(tree)
@@ -226,6 +230,46 @@ darwin_scenario <- function(tree, births) {
     }
     x[i] <- 1
     y[i] <- 1
+  }
+
+  return(list(
+    tree = tree,
+    data = data.frame(t$tip, x, y),
+    births = births
+  ))
+}
+
+unreplicated_burst_scenario <- function(tree, births) {
+  t <- phylo_to_sinba(tree)
+  if (is.null(births)) {
+    max_size <- length(t$tip) * 0.75
+    min_size <- length(t$tip) * 0.25
+    n1 <- 0
+    while (TRUE) {
+      n1 <- sample(seq_len(length(t$parent)), size = 1)
+      sz <- node_size(t, n1)
+      if (sz > min_size && sz <= max_size) {
+        break
+      }
+    }
+    births[[1]] <- list(node = n1)
+    births[[2]] <- list(node = n1)
+  }
+  if (length(births) < 2) {
+    stop("sim_sinba: `births` should have at least two elements")
+  }
+  n <- births[[1]]$node
+
+  x <- rep(0, length(t$tip))
+  y <- rep(0, length(t$tip))
+  for (i in seq_len(length(t$tip))) {
+    if (!is_parent(t, n, i)) {
+      next
+    }
+    x[i] <- 1
+    if (runif(1) < 0.5) {
+      y[i] <- 1
+    }
   }
 
   return(list(
