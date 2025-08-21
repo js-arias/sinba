@@ -85,7 +85,11 @@ dollo <- function(t, ns) {
     ns[a] <- ns[a] | ns[n]
   }
 
-  return(dollo_uppass(t, t$root_id, ns))
+  dn <- dollo_uppass(t, t$root_id, ns)
+  if (dn == 0) {
+    dn <- t$root_id
+  }
+  return(dn)
 }
 
 # dollo_uppass returns the first node
