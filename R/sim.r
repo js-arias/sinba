@@ -14,6 +14,8 @@
 #'   Valid values are:
 #'     "darwin": for the Darwin´s scenario.
 #'     "unrep":  for the Unreplicated burst scenario.
+#'     "burst":  for the Replicated burst scenario.
+#'     "codis":  for the Replicated co-distribution scenario.
 #' @param rate_mat Rate matrix for the traits with the full process.
 #' @param semi_mat Rate matrix for the traits with the semi-active process.
 #' @param births A list with the two birth events.
@@ -47,6 +49,12 @@ sim_sinba <- function(
   }
   if (scenario == "unrep") {
     return(unreplicated_burst_scenario(tree, births))
+  }
+  if (scenario == "codis") {
+    return(replicated_codistribution_scenario(tree))
+  }
+  if (scenario == "burst") {
+    return(replicated_burst_scenario(tree))
   }
 
   t <- phylo_to_sinba(tree)
@@ -271,6 +279,104 @@ unreplicated_burst_scenario <- function(tree, births) {
       y[i] <- 1
     }
   }
+
+  return(list(
+    tree = tree,
+    data = data.frame(t$tip, x, y),
+    births = births
+  ))
+}
+
+replicated_codistribution_scenario <- function(tree) {
+  t <- phylo_to_sinba(tree)
+
+  max_size <- length(t$tip) * 0.30
+  min_size <- length(t$tip) * 0.05
+  valid_size <- c()
+  for (n in seq_len(length(t$parent))) {
+    sz <- node_size(t, n)
+    if (sz >= min_size && sz <= max_size) {
+      valid_size <- c(valid_size, n)
+    }
+  }
+
+  nodes <- sample(valid_size, size = length(valid_size) * 0.4)
+  x <- rep(0, length(t$tip))
+  y <- rep(0, length(t$tip))
+  for (i in seq_len(length(t$tip))) {
+    for (n in nodes) {
+      if (!is_parent(t, n, i)) {
+        next
+      }
+      x[i] <- 1
+      y[i] <- 1
+    }
+  }
+
+  n0 <- sample(valid_size, size = 2)
+  for (i in seq_len(length(t$tip))) {
+    for (n in n0) {
+      if (!is_parent(t, n, i)) {
+        next
+      }
+      x[i] <- 0
+      y[i] <- 0
+    }
+  }
+
+  births <- list()
+  births[[1]] <- list(node = t$root_id)
+  births[[2]] <- list(node = t$root_id)
+
+  return(list(
+    tree = tree,
+    data = data.frame(t$tip, x, y),
+    births = births
+  ))
+}
+
+replicated_burst_scenario <- function(tree) {
+  t <- phylo_to_sinba(tree)
+
+  max_size <- length(t$tip) * 0.30
+  min_size <- length(t$tip) * 0.05
+  valid_size <- c()
+  for (n in seq_len(length(t$parent))) {
+    sz <- node_size(t, n)
+    if (sz >= min_size && sz <= max_size) {
+      valid_size <- c(valid_size, n)
+    }
+  }
+
+  nodes <- sample(valid_size, size = length(valid_size) * 0.4)
+  x <- rep(0, length(t$tip))
+  y <- rep(0, length(t$tip))
+  for (i in seq_len(length(t$tip))) {
+    for (n in nodes) {
+      if (!is_parent(t, n, i)) {
+        next
+      }
+      x[i] <- 1
+      if (runif(1) < 0.5) {
+        y[i] <- 1
+      }
+    }
+  }
+
+  n0 <- sample(valid_size, size = 2)
+  for (i in seq_len(length(t$tip))) {
+    for (n in n0) {
+      if (!is_parent(t, n, i)) {
+        next
+      }
+      x[i] <- 0
+      y[i] <- 0
+    }
+  }
+
+  births <- list()
+  births[[1]] <- list(node = t$root_id)
+  births[[2]] <- list(node = t$root_id)
 
   return(list(
     tree = tree,
