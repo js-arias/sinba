@@ -19,7 +19,7 @@
 #' @param model Model of evolution for the traits.
 #'   By default it uses the independent model ("IND").
 #'   The standard model for correlated traits
-#'   sn the "DEP" model.
+#'   sn the "CORR" model.
 #'   In the "xy" model it is assumed that traits are correlated
 #'   and the process for both traits
 #'   start simultaneously,
@@ -29,12 +29,16 @@
 #'   in any direction;
 #'   the "ER2" model also has equal rates,
 #'   but rates are different for each trait;
+#'   in the "ERs" model the rates of state transitions are equal
+#'   but can be different depending on the state.
 #'   If the "SYM" model changes between states are equal.
 #'   There a two full dependant models,
 #'   "x" for a model in which trait x depends on y;
 #'   and "y" in which trait y depends on x.
 #'   The "coll" model collapse (i.e., removes)
 #'   entries for unobserved traits.
+#'   In the "sCORR" model,
+#'   rates are correlated by the state of the other trait.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -64,7 +68,7 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
     return(obj)
   }
   if (model == "ARD" || model == "xy") {
-    obj <- sinba_corr(t, cond, model, root, opts)
+    obj <- sinba_xy(t, cond, model, root, opts)
     obj$data <- data
     obj$tree <- tree
     return(obj)
@@ -929,9 +933,9 @@ print.fixed_sinba <- function(x, digits = 6, ...) {
   print(root)
 }
 
-# sinba_corr makes the maximum likelihood estimation
+# sinba_xy makes the maximum likelihood estimation
 # of the correlated model.
-sinba_corr <- function(t, cond, model, root, opts) {
+sinba_xy <- function(t, cond, model, root, opts) {
   mQ <- model_matrix(model)
 
   youngest <- youngest_birth_event(t, cond)

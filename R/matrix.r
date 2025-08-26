@@ -10,12 +10,21 @@ model_matrix <- function(model = "") {
     ), nrow = 4, byrow = TRUE))
   }
   if (model == "ER2") {
-    # equal rates model
+    # equal rates model for each trait
     return(matrix(c(
       0, 1, 2, 0,
       1, 0, 0, 2,
       2, 0, 0, 1,
       0, 2, 1, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if (model == "ERs") {
+    # equal rates model for each state
+    return(matrix(c(
+      0, 1, 1, 0,
+      2, 0, 0, 1,
+      2, 0, 0, 1,
+      0, 2, 2, 0
     ), nrow = 4, byrow = TRUE))
   }
   if (model == "SYM") {
@@ -27,13 +36,23 @@ model_matrix <- function(model = "") {
       0, 3, 4, 0
     ), nrow = 4, byrow = TRUE))
   }
-  if ((model == "xy") || (model == "ARD") || (model == "DEP")) {
+  if ((model == "xy") || (model == "ARD") ||
+    (model == "DEP") || (model == "CORR")) {
     # correlated model
     return(matrix(c(
       0, 1, 2, 0,
       3, 0, 0, 4,
       5, 0, 0, 6,
       0, 7, 8, 0
+    ), nrow = 4, byrow = TRUE))
+  }
+  if (model == "sCORR") {
+    # simplified correlated model
+    return(matrix(c(
+      0, 1, 1, 0,
+      1, 0, 0, 2,
+      1, 0, 0, 2,
+      0, 2, 2, 0
     ), nrow = 4, byrow = TRUE))
   }
   if (model == "x") {
