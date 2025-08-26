@@ -16,17 +16,19 @@
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
 #' @param model Model of evolution for the traits.
-#'   By default it uses the independent model.
-#'   Other valid values are "ARD"
-#'   or "xy" for a fully correlated model;
-#'   "ER" for a model in which both traits have equal rates
+#'   By default it uses the independent model ("IND").
+#'   The standard model for correlated traits
+#'   sn the "DEP", "xy", or "ARD" model.
+#'   In the "ER" model both traits have equal rates
 #'   in any direction;
-#'   "ER2" for an equal rates model,
+#'   the "ER2" model also has equal rates,
 #'   but rates are different for each trait;
-#'   "SYM" for the symmetric model
-#'   in which changes between states are equal;
+#'   If the "SYM" model changes between states are equal.
+#'   There a two full dependant models,
 #'   "x" for a model in which trait x depends on y;
 #'   and "y" in which trait y depends on x.
+#'   The "coll" model collapse (i.e., removes)
+#'   entries for unobserved traits.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.

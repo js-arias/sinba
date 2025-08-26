@@ -18,30 +18,23 @@
 #'   Any other column will be ignored.
 #' @param model Model of evolution for the traits.
 #'   By default it uses the independent model ("IND").
-#'   There are three models, in which both traits are correlated,
-#'   the "DEP", the "xy", and the "ARD" model.
-#'   In the "DEP" model,
-#'   the rates of the semiactive process are taken
-#'   from the full process Q matrix,
-#'   In the "xy" it is assumed that the process for both traits
+#'   The standard model for correlated traits
+#'   sn the "DEP" model.
+#'   In the "xy" model it is assumed that traits are correlated
+#'   and the process for both traits
 #'   start simultaneously,
 #'   so there is no semi-active process,
 #'   and only a single birth.
-#'   In the "ARD" model,
-#'   the rates of the semiactive process
-#'   are also free parameters
-#'   (in all other model,
-#'   the parameters of the semi-active process
-#'   are taken from the full process).
-#'   Other models are,
-#'   "ER" for a model in which both traits have equal rates
+#'   In the "ER" model both traits have equal rates
 #'   in any direction;
-#'   "ER2" for an equal rates model,
+#'   the "ER2" model also has equal rates,
 #'   but rates are different for each trait;
-#'   "SYM" for the symmetric model
-#'   in which changes between states are equal;
+#'   If the "SYM" model changes between states are equal.
+#'   There a two full dependant models,
 #'   "x" for a model in which trait x depends on y;
 #'   and "y" in which trait y depends on x.
+#'   The "coll" model collapse (i.e., removes)
+#'   entries for unobserved traits.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -78,6 +71,9 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
   }
 
   mQ <- model_matrix(model)
+  if (model == "coll") {
+    mQ <- collapse_model(observed(t, data))
+  }
   k <- max(mQ) + 2
 
   youngest <- youngest_birth_event(t, cond)
@@ -349,6 +345,9 @@ fit_fixed_births <- function(
   root <- root / sum(root)
 
   mQ <- model_matrix(model)
+  if (model == "coll") {
+    mQ <- collapse_model(observed(t, data))
+  }
   k <- max(mQ)
 
   if (is.null(births)) {

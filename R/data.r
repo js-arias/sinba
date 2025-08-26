@@ -73,3 +73,22 @@ init_conditionals <- function(t, data, traits) {
   }
   return(cond)
 }
+
+# observed returns the state combinations of two traits.
+observed <- function(t, data) {
+  obs <- rep(FALSE, 4)
+  for (i in seq_len(length(t$tip))) {
+    r <- which(data[, 1] == t$tip[i])
+    # do all combinations
+    if (data[r, 2] == 0 && data[r, 3] == 0) {
+      obs[1] <- TRUE
+    } else if (data[r, 2] == 0 && data[r, 3] == 1) {
+      obs[2] <- TRUE
+    } else if (data[r, 2] == 1 && data[r, 3] == 0) {
+      obs[3] <- TRUE
+    } else if (data[r, 2] == 1 && data[r, 3] == 1) {
+      obs[4] <- TRUE
+    }
+  }
+  return(obs)
+}

@@ -130,3 +130,46 @@ semi_active_Q <- function(sc, Q) {
   msg <- sprintf("semi_active_Q: unknown scenario '%s'", sc)
   stop(msg)
 }
+
+# format_model_matrix checks the parameter labels
+# in a model matrix
+format_model_matrix <- function(model) {
+  param <- list()
+  states <- 0
+  for (i in seq_len(nrow(model))) {
+    for (j in seq_len(ncol(model))) {
+      if (i == j) {
+        model[i, j] <- 0
+        next
+      }
+      if (model[i, j] == 0) {
+        next
+      }
+      x <- param[model[i, j]][[1]]
+      if (is.null(x)) {
+        states <- states + 1
+        x <- states
+        param[[model[i, j]]] <- states
+      }
+      model[i, j] <- x
+    }
+  }
+  return(model)
+}
+
+# collapse_model removes parameters from unobserved states.
+collapse_model <- function(obs) {
+  model <- model_matrix("ARD")
+  for (i in seq_len(length(obs))) {
+    if (obs[i]) {
+      next
+    }
+    model[i, ] <- 0
+    model[, i] <- 0
+  }
+  model <- format_model_matrix(model)
+  if (max(model) == 0) {
+    stop("collapse_model: model cannot be collapsed")
+  }
+  return(model)
+}
