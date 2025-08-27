@@ -42,10 +42,17 @@
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
-fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
+fit_sinba <- function(
+    tree, data, model = "IND",
+    root = NULL, root_method = "prior", opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -60,15 +67,18 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
     stop("fit_sinba: invalid size for `root` vector.")
   }
   root <- root / sum(root)
+  if (root_method == "FitzJohn") {
+    root <- rep(1, ncol(cond))
+  }
 
   if (model == "x" || model == "y") {
-    obj <- sinba_dep(t, cond, model, root, opts)
+    obj <- sinba_dep(t, cond, model, root, root_method, opts)
     obj$data <- data
     obj$tree <- tree
     return(obj)
   }
   if (model == "ARD" || model == "xy") {
-    obj <- sinba_xy(t, cond, model, root, opts)
+    obj <- sinba_xy(t, cond, model, root, root_method, opts)
     obj$data <- data
     obj$tree <- tree
     return(obj)
@@ -118,7 +128,7 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
       semi_Q <- Q
       lk <- sinba_like(
         t, Q, semi_Q, births, xt, cond,
-        log(root_prob), ev_prob
+        log(root_prob), root_method, ev_prob
       )
       return(-lk)
     })
@@ -181,6 +191,7 @@ fit_sinba <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
     births = births,
     states = c("00", "01", "10", "11"),
     root_prior = root,
+    root_method = root_method,
     data = data,
     tree = tree
   )
@@ -285,10 +296,14 @@ print.fit_sinba <- function(x, digits = 6, ...) {
     semi <- normalize_Q(semi)
     print(semi)
   }
-  cat("Root prior:\n")
-  root <- x$root_prior
-  names(root) <- x$states
-  print(root)
+  if (x$root_method == "FitzJohn") {
+    cat("Root method: FitzJohn\n")
+  } else {
+    cat("Root prior:\n")
+    root <- x$root_prior
+    names(root) <- x$states
+    print(root)
+  }
 }
 
 #' @export
@@ -327,11 +342,17 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_births <- function(
-    tree, data, births, model = "IND", root = NULL,
+    tree, data, births, model = "IND",
+    root = NULL, root_method = "FitzJohn",
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_births: `tree` must be an object of class \"phylo\".")
@@ -347,6 +368,9 @@ fit_fixed_births <- function(
     stop("fit_fixed_births: invalid size for `root` vector.")
   }
   root <- root / sum(root)
+  if (root_method == "FitzJohn") {
+    root <- rep(1, ncol(cond))
+  }
 
   mQ <- model_matrix(model)
   if (model == "coll") {
@@ -394,6 +418,7 @@ fit_fixed_births <- function(
         births = births,
         states = c("00", "01", "10", "11"),
         root_prior = root,
+        root_method = root_method,
         data = data,
         tree = tree
       )
@@ -418,6 +443,7 @@ fit_fixed_births <- function(
       births = births,
       states = c("00", "01", "10", "11"),
       root_prior = root,
+      root_method = root_method,
       data = data,
       tree = tree
     )
@@ -440,6 +466,7 @@ fit_fixed_births <- function(
           births = births,
           states = c("00", "01", "10", "11"),
           root_prior = root,
+          root_method = root_method,
           data = data,
           tree = tree
         )
@@ -456,6 +483,7 @@ fit_fixed_births <- function(
           births = births,
           states = c("00", "01", "10", "11"),
           root_prior = root,
+          root_method = root_method,
           data = data,
           tree = tree
         )
@@ -477,6 +505,7 @@ fit_fixed_births <- function(
           births = births,
           states = c("00", "01", "10", "11"),
           root_prior = root,
+          root_method = root_method,
           data = data,
           tree = tree
         )
@@ -493,6 +522,7 @@ fit_fixed_births <- function(
           births = births,
           states = c("00", "01", "10", "11"),
           root_prior = root,
+          root_method = root_method,
           data = data,
           tree = tree
         )
@@ -520,7 +550,7 @@ fit_fixed_births <- function(
       semi_Q <- Q
       lk <- sinba_like(
         t, Q, semi_Q, births, xt, cond,
-        log(root_prob), ev_prob
+        log(root_prob), root_method, ev_prob
       )
       return(-lk)
     })
@@ -557,6 +587,7 @@ fit_fixed_births <- function(
     births = births,
     states = c("00", "01", "10", "11"),
     root_prior = root,
+    root_method = root_method,
     data = data,
     tree = tree
   )
@@ -588,12 +619,17 @@ fit_fixed_births <- function(
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_matrix <- function(
     tree, data, rate_mat, semi_mat = NULL,
-    root = NULL, opts = NULL) {
+    root = NULL, root_method = "prior", opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
   }
@@ -608,6 +644,9 @@ fit_fixed_matrix <- function(
     stop("fit_fixed_matrix: invalid size for `root` vector.")
   }
   root <- root / sum(root)
+  if (root_method == "FitzJohn") {
+    root <- rep(1, ncol(cond))
+  }
 
   if (is.null(rate_mat)) {
     stop("fit_fixed_matrix: `rate_mat` must be a matrix")
@@ -664,7 +703,7 @@ fit_fixed_matrix <- function(
 
       lk <- sinba_like(
         t, rate_mat, semi_mat, births, xt, cond,
-        log(root_prob), ev_prob
+        log(root_prob), root_method, ev_prob
       )
       return(-lk)
     })
@@ -728,6 +767,7 @@ fit_fixed_matrix <- function(
     births = births,
     states = c("00", "01", "10", "11"),
     root_prior = root,
+    root_method = root_method,
     data = data,
     tree = tree
   )
@@ -764,9 +804,14 @@ fit_fixed_matrix <- function(
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 fixed_sinba <- function(
     tree, data, rate_mat, births,
-    semi_mat = NULL, root = NULL) {
+    semi_mat = NULL, root = NULL, root_method = "prior") {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -781,6 +826,9 @@ fixed_sinba <- function(
     stop("fixed_sinba: invalid size for `root` vector.")
   }
   root <- root / sum(root)
+  if (root_method == "FitzJohn") {
+    root <- rep(1, ncol(cond))
+  }
 
   if (is.null(rate_mat)) {
     stop("fixed_sinba: `rate_mat` must be a matrix")
@@ -840,6 +888,7 @@ fixed_sinba <- function(
         births = births,
         states = c("00", "01", "10", "11"),
         root_prior = root,
+        root_method = root_method,
         data = data,
         tree = tree
       )
@@ -863,6 +912,7 @@ fixed_sinba <- function(
       births = births,
       states = c("00", "01", "10", "11"),
       root_prior = root,
+      root_method = root_method,
       data = data,
       tree = tree
     )
@@ -875,7 +925,7 @@ fixed_sinba <- function(
   xt <- tree_to_cpp(t)
   lk <- sinba_like(
     t, rate_mat, semi_mat, births, xt, cond,
-    log(root_prob), ev_prob
+    log(root_prob), root_method, ev_prob
   )
 
   obj <- list(
@@ -885,6 +935,7 @@ fixed_sinba <- function(
     births = births,
     states = c("00", "01", "10", "11"),
     root_prior = root,
+    root_method = root_method,
     data = data,
     tree = tree
   )
@@ -927,15 +978,19 @@ print.fixed_sinba <- function(x, digits = 6, ...) {
   rownames(semi) <- x$states
   colnames(semi) <- x$states
   print(semi)
-  cat("Root prior:\n")
-  root <- x$root_prior
-  names(root) <- x$states
-  print(root)
+  if (x$root_method == "FitzJohn") {
+    cat("Root method: FitzJohn\n")
+  } else {
+    cat("Root prior:\n")
+    root <- x$root_prior
+    names(root) <- x$states
+    print(root)
+  }
 }
 
 # sinba_xy makes the maximum likelihood estimation
 # of the correlated model.
-sinba_xy <- function(t, cond, model, root, opts) {
+sinba_xy <- function(t, cond, model, root, root_method, opts) {
   mQ <- model_matrix(model)
 
   youngest <- youngest_birth_event(t, cond)
@@ -979,7 +1034,7 @@ sinba_xy <- function(t, cond, model, root, opts) {
         semi_Q <- Q
         lk <- sinba_like(
           t, Q, semi_Q, births, xt, cond,
-          log(root_prob), ev_prob
+          log(root_prob), root_method, ev_prob
         )
         return(-lk)
       })
@@ -1041,7 +1096,8 @@ sinba_xy <- function(t, cond, model, root, opts) {
       Q = q,
       births = births,
       states = c("00", "01", "10", "11"),
-      root_prior = root
+      root_prior = root,
+      root_method = root_method
     )
     class(obj) <- "fit_sinba"
     return(obj)
@@ -1115,7 +1171,7 @@ sinba_xy <- function(t, cond, model, root, opts) {
       semi_Q <- from_model_to_Q(semi, p[(3 + max(mQ)):length(p)])
       lk <- sinba_like(
         t, Q, semi_Q, births, xt, cond,
-        log(root_prob), ev_prob
+        log(root_prob), root_method, ev_prob
       )
       return(-lk)
     })
@@ -1224,7 +1280,8 @@ sinba_xy <- function(t, cond, model, root, opts) {
     semi_Q = semi_q,
     births = births,
     states = c("00", "01", "10", "11"),
-    root_prior = root
+    root_prior = root,
+    root_method = root_method
   )
   class(obj) <- "fit_sinba"
   return(obj)
@@ -1232,7 +1289,7 @@ sinba_xy <- function(t, cond, model, root, opts) {
 
 # sinba_dep makes the maximum likelihood estimation
 # of dependant models.
-sinba_dep <- function(t, cond, model, root, opts) {
+sinba_dep <- function(t, cond, model, root, root_method, opts) {
   mQ <- model_matrix(model)
   k <- max(mQ) + 2
 
@@ -1290,7 +1347,7 @@ sinba_dep <- function(t, cond, model, root, opts) {
       semi_Q <- Q
       lk <- sinba_like(
         t, Q, semi_Q, births, xt, cond,
-        log(root_prob), ev_prob
+        log(root_prob), root_method, ev_prob
       )
       return(-lk)
     })
@@ -1368,7 +1425,8 @@ sinba_dep <- function(t, cond, model, root, opts) {
     Q = q,
     births = births,
     states = c("00", "01", "10", "11"),
-    root_prior = root
+    root_prior = root,
+    root_method = root_method
   )
   class(obj) <- "fit_sinba"
   return(obj)
@@ -1376,7 +1434,9 @@ sinba_dep <- function(t, cond, model, root, opts) {
 
 # sinba_like calculates the likelihood
 # of the sinba model.
-sinba_like <- function(t, Q, semi_Q, births, xt, cond, root_prior, ev_prob) {
+sinba_like <- function(
+    t, Q, semi_Q, births, xt, cond,
+    root_prior, root_method, ev_prob) {
   # make sure that Q matrix is valid
   Q[1, 4] <- 0
   Q[2, 3] <- 0
@@ -1460,6 +1520,15 @@ sinba_like <- function(t, Q, semi_Q, births, xt, cond, root_prior, ev_prob) {
     likes <- c(likes, l[t$root_id, r] + root_prior[r])
   }
   mx <- max(likes)
+  if (root_method == "FitzJohn") {
+    l <- exp(likes - mx)
+    d <- sum(l)
+    lk <- 0
+    for (i in seq_len(length(l))) {
+      lk <- lk + l[i] * l[i] / d
+    }
+    return(log(lk) + ev_prob + mx)
+  }
   lk <- log(sum(exp(likes - mx))) + ev_prob + mx
   return(lk)
 }

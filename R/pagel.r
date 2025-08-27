@@ -36,10 +36,17 @@
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
-fit_pagel <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
+fit_pagel <- function(
+    tree, data, model = "IND",
+    root = NULL, root_method = "prior", opts = NULL) {
   root_id <- length(tree$tip.label) + 1
   births <- list()
   for (i in 1:2) {
@@ -49,7 +56,7 @@ fit_pagel <- function(tree, data, model = "IND", root = NULL, opts = NULL) {
     )
     births[[i]] <- b
   }
-  obj <- fit_fixed_births(tree, data, births, model, root, opts)
+  obj <- fit_fixed_births(tree, data, births, model, root, root_method, opts)
   obj$model <- sprintf("Pagel + %s", model)
   return(obj)
 }
