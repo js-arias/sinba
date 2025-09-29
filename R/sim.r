@@ -78,7 +78,7 @@ sim_sinba <- function(
     stop("sim_sinba: `semi_mat` should be 4x4")
   }
   rate_mat <- normalize_Q(rate_mat)
-  semi_mat <- normalize_Q(semi_active_Q("12", semi_mat))
+  semi_mat <- normalize_Q(semi_active_Q("13", semi_mat))
 
   if (is.null(births)) {
     max_size <- length(t$tip) * 0.75
