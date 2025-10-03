@@ -1437,11 +1437,6 @@ sinba_dep <- function(t, cond, model, root, root_method, opts) {
 sinba_like <- function(
     t, Q, semi_Q, births, xt, cond,
     root_prior, root_method, ev_prob) {
-  # make sure that Q matrix is valid
-  Q[1, 4] <- 0
-  Q[2, 3] <- 0
-  Q[3, 2] <- 0
-  Q[4, 1] <- 0
   Q <- normalize_Q(Q)
 
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))

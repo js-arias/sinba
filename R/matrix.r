@@ -75,6 +75,17 @@ model_matrix <- function(model = "") {
       0, 4, 6, 0
     ), nrow = 4, byrow = TRUE))
   }
+  if (model == "CMK") {
+    # correlated Mk model
+    # the correlation is given by simultaneous change
+    # in both states.
+    return(matrix(c(
+      0, 1, 2, 3,
+      1, 0, 3, 2,
+      2, 3, 0, 1,
+      3, 2, 1, 0
+    ), nrow = 4, byrow = TRUE))
+  }
 
   # by default returns the independent model
   return(matrix(c(

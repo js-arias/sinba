@@ -14,6 +14,21 @@ phylo_node_age <- function(phy, n) {
   return(s)
 }
 
+# phylo_node_length returns the length
+# of all descendants of a node.
+phylo_node_length <- function(phy, n) {
+  s <- 0
+  e <- which(phy$edge[, 1] == n)
+  if (length(e) == 0) {
+    return(0)
+  }
+  for (i in seq_len(length(e))) {
+    child <- phy$edge[e, 2]
+    s <- s + phy$edge.length[e] + phylo_node_length(phy, child)
+  }
+  return(s)
+}
+
 # phylo_to_sinba transforms an ape tree
 # (an object of class "phylo")
 # into a tree used for most internal functions
