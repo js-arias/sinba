@@ -10,6 +10,7 @@ fit_fixed_matrix(
   rate_mat,
   semi_mat = NULL,
   root = NULL,
+  root_method = "prior",
   opts = NULL
 )
 }
@@ -32,6 +33,12 @@ from the full process.}
 \item{root}{Root prior probabilities.
 By default,
 all states will have the same probability.}
+
+\item{root_method}{Method for root calculation at the root.
+By default it use the root prior.
+If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+method,
+in which ancestral states are weighted by its own likelihood.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.

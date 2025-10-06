@@ -4,7 +4,14 @@
 \alias{fit_pagel}
 \title{Maximum Likelihood Estimation of the Pagel's Model Under the Sinba Model}
 \usage{
-fit_pagel(tree, data, model = "IND", root = NULL, opts = NULL)
+fit_pagel(
+  tree,
+  data,
+  model = "IND",
+  root = NULL,
+  root_method = "prior",
+  opts = NULL
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -16,21 +23,33 @@ coded as 0 and 1.
 Any other column will be ignored.}
 
 \item{model}{Model of evolution for the traits.
-By default it uses the independent model.
-Other valid values are "ARD"
-or "xy" for a fully correlated model;
-"ER" for a model in which both traits have equal rates
+By default it uses the independent model ("IND").
+The standard model for correlated traits
+can be referred as "CORR", "DEP", "xy", or "ARD".
+In the "ER" model both traits have equal rates
 in any direction;
-"ER2" for an equal rates model,
+the "ER2" model also has equal rates,
 but rates are different for each trait;
-"SYM" for the symmetric model
-in which changes between states are equal;
+in the "ERs" model the rates of state transitions are equal
+but can be different depending on the state.
+If the "SYM" model changes between states are equal.
+There a two full dependant models,
 "x" for a model in which trait x depends on y;
-and "y" in which trait y depends on x.}
+and "y" in which trait y depends on x.
+The "coll" model collapse (i.e., removes)
+entries for unobserved traits.
+In the "sCORR" model,
+rates are correlated by the state of the other trait.}
 
 \item{root}{Root prior probabilities.
 By default,
 all states will have the same probability.}
+
+\item{root_method}{Method for root calculation at the root.
+By default it use the root prior.
+If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+method,
+in which ancestral states are weighted by its own likelihood.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.

@@ -4,7 +4,7 @@
 \alias{sim_sinba}
 \title{Simulate A Pair of Traits Under the Sinba Model}
 \usage{
-sim_sinba(tree, rate_mat, semi_mat = NULL, births = NULL)
+sim_sinba(tree, rate_mat = NULL, semi_mat = NULL, births = NULL, scenario = "")
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -26,6 +26,13 @@ One of the nodes in the birth pair
 must be an ancestor of other node.
 If it is NULL,
 a random pair of birth events will be selected.}
+
+\item{scenario}{A predefined scenario.
+Valid values are:
+"darwin": for the Darwin´s scenario.
+"unrep":  for the Unreplicated burst scenario.
+"burst":  for the Replicated burst scenario.
+"codis":  for the Replicated co-distribution scenario.}
 }
 \value{
 A list with the tree,

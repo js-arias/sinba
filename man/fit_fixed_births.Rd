@@ -4,7 +4,15 @@
 \alias{fit_fixed_births}
 \title{Maximum Likelihood Estimation of a Transition Matrix With Fixed Births}
 \usage{
-fit_fixed_births(tree, data, births, model = "IND", root = NULL, opts = NULL)
+fit_fixed_births(
+  tree,
+  data,
+  births,
+  model = "IND",
+  root = NULL,
+  root_method = "FitzJohn",
+  opts = NULL
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -37,6 +45,12 @@ and "y" in which trait y depends on x.}
 \item{root}{Root prior probabilities.
 By default,
 all states will have the same probability.}
+
+\item{root_method}{Method for root calculation at the root.
+By default it use the root prior.
+If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+method,
+in which ancestral states are weighted by its own likelihood.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.

@@ -16,29 +16,8 @@
 #'   The second and third column contains the data,
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
-#' @param model Model of evolution for the traits.
-#'   By default it uses the independent model ("IND").
-#'   The standard model for correlated traits
-#'   sn the "CORR" model.
-#'   In the "xy" model it is assumed that traits are correlated
-#'   and the process for both traits
-#'   start simultaneously,
-#'   so there is no semi-active process,
-#'   and only a single birth.
-#'   In the "ER" model both traits have equal rates
-#'   in any direction;
-#'   the "ER2" model also has equal rates,
-#'   but rates are different for each trait;
-#'   in the "ERs" model the rates of state transitions are equal
-#'   but can be different depending on the state.
-#'   If the "SYM" model changes between states are equal.
-#'   There a two full dependant models,
-#'   "x" for a model in which trait x depends on y;
-#'   and "y" in which trait y depends on x.
-#'   The "coll" model collapse (i.e., removes)
-#'   entries for unobserved traits.
-#'   In the "sCORR" model,
-#'   rates are correlated by the state of the other trait.
+#' @param model A model build with `new_model()`.
+#'   By default it uses the independent model
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -51,7 +30,7 @@
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(
-    tree, data, model = "IND",
+    tree, data, model = NULL,
     root = NULL, root_method = "prior", opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
@@ -71,23 +50,14 @@ fit_sinba <- function(
     root <- rep(1, ncol(cond))
   }
 
-  if (model == "x" || model == "y") {
-    obj <- sinba_dep(t, cond, model, root, root_method, opts)
-    obj$data <- data
-    obj$tree <- tree
-    return(obj)
+  if (is.null(model)) {
+    model <- new_model("IND")
   }
-  if (model == "ARD" || model == "xy") {
-    obj <- sinba_xy(t, cond, model, root, root_method, opts)
-    obj$data <- data
-    obj$tree <- tree
-    return(obj)
+  if (!inherits(model, "sinba_model")) {
+    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
   }
 
-  mQ <- model_matrix(model)
-  if (model == "coll") {
-    mQ <- collapse_model(observed(t, data))
-  }
+  mQ <- model$model
   k <- max(mQ) + 2
 
   youngest <- youngest_birth_event(t, cond)
@@ -189,7 +159,6 @@ fit_sinba <- function(
     model = model,
     Q = q,
     births = births,
-    states = c("00", "01", "10", "11"),
     root_prior = root,
     root_method = root_method,
     data = data,
@@ -228,7 +197,13 @@ logLik.fit_sinba <- function(object, ...) {
 #' @param ... Additional arguments are unused.
 print.fit_sinba <- function(x, digits = 6, ...) {
   cat("Sinba: Fit\n")
-  cat(paste("Model: ", x$model, ".\n", sep = ""))
+
+  states <- x$model$states
+  mm <- x$model$model
+  rownames(mm) <- states
+  colnames(mm) <- states
+  cat("Model:\n")
+  print(mm)
   cat(paste("Free parameters = ", x$k, ".\n", sep = ""))
 
   aic <- 2 * x$k - 2 * x$logLik
@@ -252,8 +227,8 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   ))
   cat("Rates:\n")
   Q <- x$Q
-  rownames(Q) <- x$states
-  colnames(Q) <- x$states
+  rownames(Q) <- states
+  colnames(Q) <- states
   print(Q)
   age1 <- phylo_node_age(x$tree, b1$node)
   age2 <- phylo_node_age(x$tree, b2$node)
@@ -301,7 +276,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   } else {
     cat("Root prior:\n")
     root <- x$root_prior
-    names(root) <- x$states
+    names(root) <- states
     print(root)
   }
 }
@@ -351,7 +326,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_births <- function(
-    tree, data, births, model = "IND",
+    tree, data, births, model = NULL,
     root = NULL, root_method = "FitzJohn",
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
@@ -372,10 +347,14 @@ fit_fixed_births <- function(
     root <- rep(1, ncol(cond))
   }
 
-  mQ <- model_matrix(model)
-  if (model == "coll") {
-    mQ <- collapse_model(observed(t, data))
+  if (is.null(model)) {
+    model <- new_model("IND")
   }
+  if (!inherits(model, "sinba_model")) {
+    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+  }
+
+  mQ <- model$model
   k <- max(mQ)
 
   if (is.null(births)) {
@@ -416,7 +395,6 @@ fit_fixed_births <- function(
         model = model,
         Q = matrix(nrow = 4, ncol = 4),
         births = births,
-        states = c("00", "01", "10", "11"),
         root_prior = root,
         root_method = root_method,
         data = data,
@@ -441,7 +419,6 @@ fit_fixed_births <- function(
       model = model,
       Q = matrix(nrow = 4, ncol = 4),
       births = births,
-      states = c("00", "01", "10", "11"),
       root_prior = root,
       root_method = root_method,
       data = data,
@@ -449,87 +426,6 @@ fit_fixed_births <- function(
     )
     class(obj) <- "fit_sinba"
     return(obj)
-  }
-
-  # if birth sequence is not compatible with the model
-  # the likelihood is 0
-  if (model == "x") {
-    # the first trait is the dependant trait
-    # so it must born after second trait
-    if (b1$node == b2$node) {
-      if (b1$age < b2$age) {
-        obj <- list(
-          logLik = -Inf,
-          k = k,
-          model = model,
-          Q = matrix(nrow = 4, ncol = 4),
-          births = births,
-          states = c("00", "01", "10", "11"),
-          root_prior = root,
-          root_method = root_method,
-          data = data,
-          tree = tree
-        )
-        class(obj) <- "fit_sinba"
-        return(obj)
-      }
-    } else {
-      if (t$age[b1$node] < t$age[b2$node]) {
-        obj <- list(
-          logLik = -Inf,
-          k = k,
-          model = model,
-          Q = matrix(nrow = 4, ncol = 4),
-          births = births,
-          states = c("00", "01", "10", "11"),
-          root_prior = root,
-          root_method = root_method,
-          data = data,
-          tree = tree
-        )
-        class(obj) <- "fit_sinba"
-        return(obj)
-      }
-    }
-  }
-  if (model == "y") {
-    # the second trait is the dependant trait
-    # so it must born after first trait
-    if (b1$node == b2$node) {
-      if (b2$age < b1$age) {
-        obj <- list(
-          logLik = -Inf,
-          k = k,
-          model = model,
-          Q = matrix(nrow = 4, ncol = 4),
-          births = births,
-          states = c("00", "01", "10", "11"),
-          root_prior = root,
-          root_method = root_method,
-          data = data,
-          tree = tree
-        )
-        class(obj) <- "fit_sinba"
-        return(obj)
-      }
-    } else {
-      if (t$age[b2$node] < t$age[b1$node]) {
-        obj <- list(
-          logLik = -Inf,
-          k = k,
-          model = model,
-          Q = matrix(nrow = 4, ncol = 4),
-          births = births,
-          states = c("00", "01", "10", "11"),
-          root_prior = root,
-          root_method = root_method,
-          data = data,
-          tree = tree
-        )
-        class(obj) <- "fit_sinba"
-        return(obj)
-      }
-    }
   }
 
   ev_prob <- 2 * log(prob_birth(t))

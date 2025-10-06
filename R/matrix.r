@@ -1,3 +1,51 @@
+#' @export
+#' @title Build a Model Matrix
+#'
+#' @description
+#' `new_model()` creates a new model matrix.
+#'
+#' @param model Model of evolution for the traits.
+#'   By default it creates a matrix in which all parameters
+#'   are different,
+#'   this is the standard correlated model ("CORR").
+#'   In the independent model ("IND")
+#'   both traits evolve independently
+#'   (i.e., this is equivalent to using two Q matrices).
+#'   In the "ER" model both traits have equal rates
+#'   in any direction;
+#'   the "ER2" model also has equal rates,
+#'   but rates are different for each trait;
+#'   in the "ERs" model the rates of state transitions are equal
+#'   but can be different depending on the state.
+#'   If the "SYM" model changes between states are equal.
+#'   There a two full dependant models,
+#'   "x" for a model in which trait x
+#'   (the first trait)
+#'   depends on y;
+#'   and "y" in which trait y
+#'   (the second trait)
+#'   depends on x.
+#'   In the "sCORR" model,
+#'   rates are correlated by the state of the other trait.
+#'   In the "CMK" model,
+#'   is like the symmetrical model,
+#'   but changes of more than one state are allowed.
+new_model <- function(model = "") {
+  names <- c("IND", "CORR", "ER", "ER2", "ERs", "SYM", "sCORR", "x", "y", "CMK")
+  if (!(model %in% names)) {
+    model <- "CORR"
+  }
+  states <- c("0,0", "0,1", "1,0", "1,1")
+  m <- model_matrix(model)
+  obj <- list(
+    name = model,
+    model = m,
+    states = states
+  )
+  class(obj) <- "sinba_model"
+  return(obj)
+}
+
 # model_matrix returns a design matrix for a given model.
 model_matrix <- function(model = "") {
   if (model == "ER") {
@@ -27,6 +75,15 @@ model_matrix <- function(model = "") {
       0, 2, 2, 0
     ), nrow = 4, byrow = TRUE))
   }
+  if (model == "IND") {
+    # independent model
+    return(matrix(c(
+      0, 1, 2, 0,
+      3, 0, 0, 2,
+      4, 0, 0, 1,
+      0, 4, 3, 0
+    ), nrow = 4, byrow = TRUE))
+  }
   if (model == "SYM") {
     # symmetric model
     return(matrix(c(
@@ -34,16 +91,6 @@ model_matrix <- function(model = "") {
       1, 0, 0, 3,
       2, 0, 0, 4,
       0, 3, 4, 0
-    ), nrow = 4, byrow = TRUE))
-  }
-  if ((model == "xy") || (model == "ARD") ||
-    (model == "DEP") || (model == "CORR")) {
-    # correlated model
-    return(matrix(c(
-      0, 1, 2, 0,
-      3, 0, 0, 4,
-      5, 0, 0, 6,
-      0, 7, 8, 0
     ), nrow = 4, byrow = TRUE))
   }
   if (model == "sCORR") {
@@ -87,12 +134,12 @@ model_matrix <- function(model = "") {
     ), nrow = 4, byrow = TRUE))
   }
 
-  # by default returns the independent model
+  # by default returns the correlated model
   return(matrix(c(
     0, 1, 2, 0,
-    3, 0, 0, 2,
-    4, 0, 0, 1,
-    0, 4, 3, 0
+    3, 0, 0, 4,
+    5, 0, 0, 6,
+    0, 7, 8, 0
   ), nrow = 4, byrow = TRUE))
 }
 
