@@ -8,7 +8,7 @@ fit_fixed_births(
   tree,
   data,
   births,
-  model = "IND",
+  model = NULL,
   root = NULL,
   root_method = "FitzJohn",
   opts = NULL

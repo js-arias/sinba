@@ -7,7 +7,7 @@
 fit_sinba(
   tree,
   data,
-  model = "IND",
+  model = NULL,
   root = NULL,
   root_method = "prior",
   opts = NULL
@@ -22,29 +22,8 @@ The second and third column contains the data,
 coded as 0 and 1.
 Any other column will be ignored.}
 
-\item{model}{Model of evolution for the traits.
-By default it uses the independent model ("IND").
-The standard model for correlated traits
-sn the "CORR" model.
-In the "xy" model it is assumed that traits are correlated
-and the process for both traits
-start simultaneously,
-so there is no semi-active process,
-and only a single birth.
-In the "ER" model both traits have equal rates
-in any direction;
-the "ER2" model also has equal rates,
-but rates are different for each trait;
-in the "ERs" model the rates of state transitions are equal
-but can be different depending on the state.
-If the "SYM" model changes between states are equal.
-There a two full dependant models,
-"x" for a model in which trait x depends on y;
-and "y" in which trait y depends on x.
-The "coll" model collapse (i.e., removes)
-entries for unobserved traits.
-In the "sCORR" model,
-rates are correlated by the state of the other trait.}
+\item{model}{A model build with \code{new_model()}.
+By default it uses the independent model}
 
 \item{root}{Root prior probabilities.
 By default,

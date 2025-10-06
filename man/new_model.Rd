@@ -22,8 +22,12 @@ in the "ERs" model the rates of state transitions are equal
 but can be different depending on the state.
 If the "SYM" model changes between states are equal.
 There a two full dependant models,
-"x" for a model in which trait x depends on y;
-and "y" in which trait y depends on x.
+"x" for a model in which trait x
+(the first trait)
+depends on y;
+and "y" in which trait y
+(the second trait)
+depends on x.
 In the "sCORR" model,
 rates are correlated by the state of the other trait.
 In the "CMK" model,
