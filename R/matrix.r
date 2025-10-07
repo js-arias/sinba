@@ -177,6 +177,38 @@ model_equate <- function(model, params) {
   return(model)
 }
 
+#' @export
+#' @title Remove a Parameter From a Model
+#'
+#' @description
+#' `model_drop()` removes one o more parameters
+#' from a model.
+#'
+#' @param model A model definition as build with `new_model()`.
+#' @param params A vector with the parameter IDs to be removed.
+model_drop <- function(model, params) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_equate: `model` must be an object of class \"sinba_model\".")
+  }
+  m <- model$model
+  if (length(params) < 1) {
+    return(model)
+  }
+
+  for (cc in seq_len(ncol(m))) {
+    for (r in seq_len(nrow(m))) {
+      if (m[r, cc] %in% params) {
+        m[r, cc] <- 0
+      }
+    }
+  }
+
+  m <- format_model_matrix(m)
+  model$name <- "user defined"
+  model$model <- m
+  return(model)
+}
+
 # from_model_to_Q sets a Q matrix
 # from a model matrix
 # and a set of parameter values.
