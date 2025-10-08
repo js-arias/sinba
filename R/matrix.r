@@ -5,12 +5,10 @@
 #' `new_model()` creates a new model matrix.
 #'
 #' @param model Model of evolution for the traits.
-#'   By default it creates a matrix in which all parameters
-#'   are different,
-#'   this is the standard correlated model ("CORR").
-#'   In the independent model ("IND")
-#'   both traits evolve independently
+#'   By default it returns the Pagel's independent model ("IND")
 #'   (i.e., this is equivalent to using two Q matrices).
+#'   The "CORR" model is the Pagel's correlated model,
+#'   in which each transition has a different parameter.
 #'   In the "ER" model both traits have equal rates
 #'   in any direction;
 #'   the "ER2" model also has equal rates,
@@ -33,7 +31,7 @@
 new_model <- function(model = "") {
   names <- c("IND", "CORR", "ER", "ER2", "ERs", "SYM", "sCORR", "x", "y", "CMK")
   if (!(model %in% names)) {
-    model <- "CORR"
+    model <- "IND"
   }
   states <- c("0,0", "0,1", "1,0", "1,1")
   m <- model_matrix(model)
@@ -48,6 +46,15 @@ new_model <- function(model = "") {
 
 # model_matrix returns a design matrix for a given model.
 model_matrix <- function(model = "") {
+  if (model == "CORR") {
+    # correlated model
+    return(matrix(c(
+      0, 1, 2, 0,
+      3, 0, 0, 4,
+      5, 0, 0, 6,
+      0, 7, 8, 0
+    ), nrow = 4, byrow = TRUE))
+  }
   if (model == "ER") {
     # equal rates model
     return(matrix(c(
@@ -134,13 +141,46 @@ model_matrix <- function(model = "") {
     ), nrow = 4, byrow = TRUE))
   }
 
-  # by default returns the correlated model
+  # by default returns the independent model
   return(matrix(c(
     0, 1, 2, 0,
-    3, 0, 0, 4,
-    5, 0, 0, 6,
-    0, 7, 8, 0
+    3, 0, 0, 2,
+    4, 0, 0, 1,
+    0, 4, 3, 0
   ), nrow = 4, byrow = TRUE))
+}
+
+#' @export
+#' @title Add a New Parameter to a Model
+#'
+#' @description
+#' `model_add()` reads a model definition
+#' and add a new parameter at the indicated cell
+#' of the model matrix.
+#'
+#' @param model A model definition as build with `new_model()`.
+#' @param cell A vector with the row and column of the new parameter.
+model_add <- function(model, cell) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_add: `model` must be an object of class \"sinba_model\".")
+  }
+  m <- model$model
+  if (length(cell) < 2) {
+    stop("model_equate: `cell` should at least have two elements.")
+  }
+  if (cell[1] < 1 || cell[1] > nrow(m)) {
+    return(model)
+  }
+  if (cell[2] < 1 || cell[2] > ncol(m)) {
+    return(model)
+  }
+  if (cell[1] == cell[2]) {
+    return(model)
+  }
+  m[cell[1], cell[2]] <- max(m) + 1
+  model$name <- "user defined"
+  model$model <- m
+  return(model)
 }
 
 #' @export

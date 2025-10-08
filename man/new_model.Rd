@@ -8,12 +8,10 @@ new_model(model = "")
 }
 \arguments{
 \item{model}{Model of evolution for the traits.
-By default it creates a matrix in which all parameters
-are different,
-this is the standard correlated model ("CORR").
-In the independent model ("IND")
-both traits evolve independently
+By default it returns the Pagel's independent model ("IND")
 (i.e., this is equivalent to using two Q matrices).
+The "CORR" model is the Pagel's correlated model,
+in which each transition has a different parameter.
 In the "ER" model both traits have equal rates
 in any direction;
 the "ER2" model also has equal rates,
