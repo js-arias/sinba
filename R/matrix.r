@@ -348,6 +348,7 @@ model_add <- function(model, cell) {
     return(model)
   }
   m[cell[1], cell[2]] <- max(m) + 1
+  m <- format_model_matrix(m)
   model$name <- "user defined"
   model$model <- m
   return(model)
