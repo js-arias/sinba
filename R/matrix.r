@@ -151,6 +151,176 @@ model_matrix <- function(model = "") {
 }
 
 #' @export
+#' @title Create a New Model With Hidden States
+#'
+#' @description
+#' `new_hidden_model()` creates a new model matrix
+#' with hidden states.
+#' The hidden states are defined in a list
+#' with three elements:
+#' `trait` to indicates the trait
+#' (either "x", the first trait,
+#' or "y", the second trait);
+#' `state` to indicate the observed state
+#' (either 0 or 1);
+#' and `hidden` with a vector of the labels
+#' for the hidden states
+#' (e.g. "a", "b", "c").
+#' By default,
+#' the model is the maximal independent model
+#' for the given states.
+#'
+#' @param states A list with one or more elements,
+#'   each element containing a trait state
+#'   and its hidden states.
+#'
+#' @return A model matrix with hidden states.
+new_hidden_model <- function(states) {
+  if (is.null(states)) {
+    return(new_model())
+  }
+  # states with hidden states
+  hs <- c(FALSE, FALSE, FALSE, FALSE)
+  x_states <- c()
+  y_states <- c()
+  for (e in states) {
+    if (is.null(e$trait)) {
+      next
+    }
+    if (e$trait != "x" && e$trait != "y") {
+      next
+    }
+    if (is.null(e$state)) {
+      next
+    }
+    if (e$state != 0 && e$state != 1) {
+      next
+    }
+    if (length(e$hidden) <= 1) {
+      next
+    }
+    obs <- 0
+    if (e$trait == "x") {
+      obs <- 1
+      if (e$state == 1) {
+        obs <- 2
+      }
+    } else {
+      obs <- 3
+      if (e$state == 1) {
+        obs <- 4
+      }
+    }
+    if (hs[obs]) {
+      next
+    }
+    for (i in seq_len(length(e$hidden))) {
+      s <- sprintf("%s%d%s", e$trait, e$state, e$hidden[i])
+      if (e$trait == "x") {
+        x_states <- c(x_states, s)
+      } else {
+        y_states <- c(y_states, s)
+      }
+    }
+    hs[obs] <- TRUE
+  }
+  if (!any(hs)) {
+    return(new_model())
+  }
+  for (i in seq_len(length(hs))) {
+    if (hs[i]) {
+      next
+    }
+    if (i == 1) {
+      x_states <- c(x_states, "x0")
+    }
+    if (i == 2) {
+      x_states <- c(x_states, "x1")
+    }
+    if (i == 3) {
+      y_states <- c(y_states, "y0")
+    }
+    if (i == 4) {
+      y_states <- c(y_states, "y1")
+    }
+  }
+  x_states <- sort(x_states)
+  y_states <- sort(y_states)
+
+  # combine individual states
+  observed <- list()
+  states <- c()
+  for (i in seq_len(length(x_states))) {
+    for (j in seq_len(length(y_states))) {
+      s <- sprintf("%s,%s", x_states[i], y_states[j])
+      o <- ""
+      if (startsWith(x_states[i], "x0")) {
+        o <- "00"
+        if (startsWith(y_states[j], "y1")) {
+          o <- "01"
+        }
+      } else {
+        o <- "10"
+        if (startsWith(y_states[j], "y1")) {
+          o <- "11"
+        }
+      }
+      observed[[s]] <- o
+      states <- c(states, s)
+    }
+  }
+  states <- sort(states)
+
+  # build the matrix
+  m <- matrix(0, nrow = length(states), ncol = length(states))
+  rownames(m) <- states
+  colnames(m) <- states
+  p <- 1
+
+  # x trait
+  for (i in seq_len(length(x_states))) {
+    for (j in seq_len(length(x_states))) {
+      if (i == j) {
+        next
+      }
+      for (k in seq_len(length(y_states))) {
+        from <- sprintf("%s,%s", x_states[i], y_states[k])
+        to <- sprintf("%s,%s", x_states[j], y_states[k])
+        m[from, to] <- p
+      }
+      p <- p + 1
+    }
+  }
+
+  # y trait
+  for (i in seq_len(length(y_states))) {
+    for (j in seq_len(length(y_states))) {
+      if (i == j) {
+        next
+      }
+      for (k in seq_len(length(x_states))) {
+        from <- sprintf("%s,%s", x_states[k], y_states[i])
+        to <- sprintf("%s,%s", x_states[k], y_states[j])
+        m[from, to] <- p
+      }
+      p <- p + 1
+    }
+  }
+
+  rownames(m) <- NULL
+  colnames(m) <- NULL
+  m <- format_model_matrix(m)
+  obj <- list(
+    name = "hidden",
+    model = m,
+    states = states,
+    observed = observed
+  )
+  class(obj) <- "sinba_model"
+  return(obj)
+}
+
+#' @export
 #' @title Add a New Parameter to a Model
 #'
 #' @description
