@@ -107,7 +107,6 @@ fit_sinba <- function(
     v <- 1e-06
     opts <- list(
       "algorithm" = "NLOPT_LN_SBPLX",
-      # set the upper bound using the number of replicates
       xtol_abs = rep(v, k),
       maxeval = 10000
     )
@@ -480,8 +479,7 @@ fit_fixed_births <- function(
     v <- 1e-06
     opts <- list(
       "algorithm" = "NLOPT_LN_SBPLX",
-      # set the upper bound using the number of replicates
-      xtol_abs = rep(v, 3),
+      xtol_abs = rep(v, k),
       maxeval = 10000
     )
   }
