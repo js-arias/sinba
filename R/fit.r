@@ -108,7 +108,7 @@ fit_sinba <- function(
     opts <- list(
       "algorithm" = "NLOPT_LN_SBPLX",
       # set the upper bound using the number of replicates
-      xtol_abs = rep(v, 3),
+      xtol_abs = rep(v, k),
       maxeval = 10000
     )
   }
@@ -153,7 +153,7 @@ fit_sinba <- function(
     births[[i]] <- b
   }
 
-  # retrieve the scenarion
+  # retrieve the scenarios
   root_states <- update_root(t, rep(1, 4), births, youngest)
   root_names <- c("00", "01", "10", "11")
   sc <- c()
@@ -358,7 +358,18 @@ fit_fixed_births <- function(
   }
   t <- phylo_to_sinba(tree)
 
-  cond <- init_conditionals(t, data, 2)
+  if (is.null(model)) {
+    model <- new_model("IND")
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+  }
+
+  mQ <- model$model
+  k <- max(mQ)
+
+  et <- encode_traits(t, data, 2)
+  cond <- set_conditionals(t, et, model)
 
   if (is.null(root)) {
     root <- rep(1, ncol(cond))
@@ -370,16 +381,6 @@ fit_fixed_births <- function(
   if (root_method == "FitzJohn") {
     root <- rep(1, ncol(cond))
   }
-
-  if (is.null(model)) {
-    model <- new_model("IND")
-  }
-  if (!inherits(model, "sinba_model")) {
-    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
-  }
-
-  mQ <- model$model
-  k <- max(mQ)
 
   if (is.null(births)) {
     stop("fit_fixed_births: undefined `births` events")
@@ -429,10 +430,10 @@ fit_fixed_births <- function(
     }
   }
 
-  youngest <- youngest_birth_event(t, cond)
+  youngest <- youngest_birth_node(t, et, 2)
 
   # check for valid events
-  root_prob <- update_root(t, root, births, youngest)
+  root_prob <- set_root_prior(t, model, root, births, youngest)
 
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
@@ -467,9 +468,8 @@ fit_fixed_births <- function(
       }
 
       Q <- from_model_to_Q(mQ, p)
-      semi_Q <- Q
       lk <- sinba_like(
-        t, Q, semi_Q, births, xt, cond,
+        t, Q, model, births, xt, cond,
         log(root_prob), root_method, ev_prob
       )
       return(-lk)
@@ -499,6 +499,35 @@ fit_fixed_births <- function(
 
   q <- from_model_to_Q(mQ, res$solution)
   q <- normalize_Q(q)
+  # retrieve the scenarios
+  root_states <- update_root(t, rep(1, 4), births, youngest)
+  root_names <- c("00", "01", "10", "11")
+  sc <- c()
+  for (i in seq_len(length(root_states))) {
+    if (root_states[i] == 0) {
+      next
+    }
+    has_prior <- FALSE
+    for (j in seq_len(length(root))) {
+      obs <- model$observed[[model$states[j]]]
+      if (obs != root_names[i]) {
+        next
+      }
+      if (root[j] != 0) {
+        has_prior <- TRUE
+      }
+    }
+    if (!has_prior) {
+      next
+    }
+    v <- scenario(root_states[i], 1)
+    if (res$solution[2] < res$solution[1]) {
+      # second trait is the oldest one
+      v <- scenario(root_states[i], 2)
+    }
+    sc <- c(sc, v)
+  }
+
   obj <- list(
     logLik = -res$objective,
     k = k,
@@ -508,6 +537,7 @@ fit_fixed_births <- function(
     states = c("00", "01", "10", "11"),
     root_prior = root,
     root_method = root_method,
+    scenarios = sc,
     data = data,
     tree = tree
   )
