@@ -37,7 +37,17 @@ fit_sinba <- function(
   }
   t <- phylo_to_sinba(tree)
 
-  cond <- init_conditionals(t, data, 2)
+  if (is.null(model)) {
+    model <- new_model("IND")
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+  }
+  mQ <- model$model
+  k <- max(mQ) + 2
+
+  et <- encode_traits(t, data, 2)
+  cond <- set_conditionals(t, et, model)
 
   if (is.null(root)) {
     root <- rep(1, ncol(cond))
@@ -50,17 +60,7 @@ fit_sinba <- function(
     root <- rep(1, ncol(cond))
   }
 
-  if (is.null(model)) {
-    model <- new_model("IND")
-  }
-  if (!inherits(model, "sinba_model")) {
-    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
-  }
-
-  mQ <- model$model
-  k <- max(mQ) + 2
-
-  youngest <- youngest_birth_event(t, cond)
+  youngest <- youngest_birth_node(t, et, 2)
   ev_prob <- 2 * log(prob_birth(t))
 
   # closure for the likelihood function
@@ -89,15 +89,14 @@ fit_sinba <- function(
       }
 
       # update root priors
-      root_prob <- update_root(t, root, births, youngest)
+      root_prob <- set_root_prior(t, model, root, births, youngest)
       if (all(root_prob == 0)) {
         return(Inf)
       }
 
       Q <- from_model_to_Q(mQ, p[3:length(p)])
-      semi_Q <- Q
       lk <- sinba_like(
-        t, Q, semi_Q, births, xt, cond,
+        t, Q, model, births, xt, cond,
         log(root_prob), root_method, ev_prob
       )
       return(-lk)
@@ -153,6 +152,36 @@ fit_sinba <- function(
     )
     births[[i]] <- b
   }
+
+  # retrieve the scenarion
+  root_states <- update_root(t, rep(1, 4), births, youngest)
+  root_names <- c("00", "01", "10", "11")
+  sc <- c()
+  for (i in seq_len(length(root_states))) {
+    if (root_states[i] == 0) {
+      next
+    }
+    has_prior <- FALSE
+    for (j in seq_len(length(root))) {
+      obs <- model$observed[[model$states[j]]]
+      if (obs != root_names[i]) {
+        next
+      }
+      if (root[j] != 0) {
+        has_prior <- TRUE
+      }
+    }
+    if (!has_prior) {
+      next
+    }
+    v <- scenario(root_states[i], 1)
+    if (res$solution[2] < res$solution[1]) {
+      # second trait is the oldest one
+      v <- scenario(root_states[i], 2)
+    }
+    sc <- c(sc, v)
+  }
+
   obj <- list(
     logLik = -res$objective,
     k = k,
@@ -161,6 +190,7 @@ fit_sinba <- function(
     births = births,
     root_prior = root,
     root_method = root_method,
+    scenarios = sc,
     data = data,
     tree = tree
   )
@@ -238,39 +268,33 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   }
   if (age1 != age2) {
     cat("Semi-active process:\n")
-    sQ <- x$Q
-    if (!is.null(x$semi_Q)) {
+    if (length(x$scenarios) == 0) {
       sQ <- x$semi_Q
-    }
-    semi <- matrix(0, nrow = 2, ncol = 2)
-    if (age1 < age2) {
-      # first trait born first
-      semi[1, 2] <- sQ[1, 3]
-      if (sQ[1, 3] == 0) {
-        semi[1, 2] <- sQ[2, 4]
-      }
-      semi[2, 1] <- sQ[3, 1]
-      if (sQ[3, 1] == 0) {
-        semi[2, 1] <- sQ[4, 2]
-      }
-      rownames(semi) <- c("0*", "1*")
-      colnames(semi) <- c("0*", "1*")
+      rownames(sQ) <- states
+      colnames(sQ) <- states
+      sQ <- reduce_matrix(sQ)
+      print(normalize_Q(sQ))
     } else {
-      # second trait born first
-      semi[1, 2] <- sQ[1, 2]
-      if (sQ[1, 2] == 0) {
-        semi[1, 2] <- sQ[3, 4]
+      for (i in seq_len(length(x$scenarios))) {
+        sc <- x$scenarios[i]
+        sQ <- build_semi_active_Q(x$model, sc, x$Q)
+        if (sc == "12") {
+          cat("second trait active: 00 <-> 01\n")
+        } else if (sc == "13") {
+          cat("first trait active: 00 <-> 10\n")
+        } else if (sc == "24") {
+          cat("first trait active: 01 <-> 11\n")
+        } else if (sc == "34") {
+          cat("second trait active: 10 <-> 11\n")
+        }
+        rownames(sQ) <- states
+        colnames(sQ) <- states
+        sQ <- reduce_matrix(sQ)
+        print(normalize_Q(sQ))
       }
-      semi[2, 1] <- sQ[2, 1]
-      if (sQ[2, 1] == 0) {
-        semi[2, 1] <- sQ[4, 3]
-      }
-      rownames(semi) <- c("*0", "*1")
-      colnames(semi) <- c("*0", "*1")
     }
-    semi <- normalize_Q(semi)
-    print(semi)
   }
+
   if (x$root_method == "FitzJohn") {
     cat("Root method: FitzJohn\n")
   } else {
@@ -1331,7 +1355,7 @@ sinba_dep <- function(t, cond, model, root, root_method, opts) {
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(
-    t, Q, semi_Q, births, xt, cond,
+    t, Q, model, births, xt, cond,
     root_prior, root_method, ev_prob) {
   Q <- normalize_Q(Q)
 
@@ -1359,7 +1383,7 @@ sinba_like <- function(
     if (a1 < a2) {
       # first trait is the oldest one
       sc <- scenario(r, 1)
-      semi <- semi_active_Q(sc, semi_Q)
+      semi <- build_semi_active_Q(model, sc, Q)
       semi <- normalize_Q(semi)
       ev <- list(
         first = list(
@@ -1380,7 +1404,7 @@ sinba_like <- function(
     } else {
       # second trait is the oldest one
       sc <- scenario(r, 2)
-      semi <- semi_active_Q(sc, semi_Q)
+      semi <- build_semi_active_Q(model, sc, Q)
       semi <- normalize_Q(semi)
       ev <- list(
         first = list(

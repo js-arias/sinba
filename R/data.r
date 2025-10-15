@@ -1,3 +1,96 @@
+# encode_traits set up the observed traits in the data
+# as the observed states.
+encode_traits <- function(t, data, traits) {
+  if (traits == 1) {
+    et <- list()
+    for (i in seq_len(length(t$tip))) {
+      st <- retrieve_state(data, t$tip[i], 2)
+      et[[t$tip[i]]] <- list(
+        name = t$tip[i],
+        state = st
+      )
+    }
+    return(et)
+  }
+  et <- list()
+  for (i in seq_len(length(t$tip))) {
+    x <- retrieve_state(data, t$tip[i], 2)
+    y <- retrieve_state(data, t$tip[i], 3)
+    st <- sprintf("%s%s", x, y)
+    et[[t$tip[i]]] <- list(
+      name = t$tip[i],
+      state = st
+    )
+  }
+  return(et)
+}
+
+retrieve_state <- function(data, tip, trait) {
+  r <- which(data[, 1] == tip)
+  if (length(r) == 0) {
+    # unobserved tip
+    return("?")
+  }
+  states <- c(FALSE, FALSE)
+  for (i in seq_len(length(r))) {
+    if (data[r[i], trait] == 0) {
+      states[1] <- TRUE
+    }
+    if (data[r[i], trait] == 1) {
+      states[2] <- TRUE
+    }
+  }
+  if (all(states)) {
+    # polymorphic tip
+    return("p")
+  }
+  if (!states[1] && !states[2]) {
+    # unknown state is treated as unknown
+    if (length(r) == 0) {
+      # unobserved tip
+      return("?")
+    }
+  }
+  if (states[1]) {
+    return("0")
+  }
+  return("1")
+}
+
+
+# set_conditionals set up the initial log conditionals
+# (i.e., the tips)
+# of a tree.
+# Internal nodes are set as 0
+# (i.e., with probability 1).
+set_conditionals <- function(t, enc, model) {
+  cond <- matrix(0, nrow = length(t$parent), ncol = length(model$states))
+  for (i in seq_len(length(t$tip))) {
+    cond[i, ] <- -Inf
+    obs <- enc[[t$tip[i]]]$state
+    if (obs == "?" || obs == "p") {
+      obs <- c("0", "1")
+    } else if (obs == "?0" || obs == "p0") {
+      obs <- c("00", "10")
+    } else if (obs == "?1" || obs == "p1") {
+      obs <- c("01", "11")
+    } else if (obs == "0?" || obs == "0p") {
+      obs <- c("00", "01")
+    } else if (obs == "1?" || obs == "1p") {
+      obs <- c("10", "11")
+    } else if (obs == "??" || obs == "p?" || obs == "?p" || obs == "pp") {
+      obs <- c("00", "01", "10", "11")
+    }
+    for (j in seq_len(length(model$states))) {
+      x <- model$observed[model$states[j]]
+      if (any(obs == x)) {
+        cond[i, j] <- 0
+      }
+    }
+  }
+  return(cond)
+}
+
 # init_conditionals set up the initial log conditionals
 # (i.e., the tips)
 # of a tree.

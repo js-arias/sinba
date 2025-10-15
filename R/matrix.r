@@ -33,12 +33,19 @@ new_model <- function(model = "") {
   if (!(model %in% names)) {
     model <- "IND"
   }
-  states <- c("0,0", "0,1", "1,0", "1,1")
+  states <- c("x0,y0", "x0,y1", "x1,y0", "x1,y1")
+  observed <- list()
+  observed[[states[1]]] <- "00"
+  observed[[states[2]]] <- "01"
+  observed[[states[3]]] <- "10"
+  observed[[states[4]]] <- "11"
   m <- model_matrix(model)
   obj <- list(
     name = model,
     model = m,
-    states = states
+    traits = 2,
+    states = states,
+    observed = observed
   )
   class(obj) <- "sinba_model"
   return(obj)
@@ -313,6 +320,7 @@ new_hidden_model <- function(states) {
   obj <- list(
     name = "hidden",
     model = m,
+    traits = 2,
     states = states,
     observed = observed
   )
@@ -453,6 +461,64 @@ normalize_Q <- function(Q) {
   return(Q)
 }
 
+# build_semi_active_Q returns the semi-active Q
+# using a model,
+# the birth scenario,
+# and the Q matrix,
+build_semi_active_Q <- function(model, sc, Q) {
+  sm <- matrix(0, nrow = 4, ncol = 4)
+  if (sc == "12") {
+    # second trait active: 00 <-> 01
+    sm[1, 1] <- 1
+    sm[1, 2] <- 1
+    sm[2, 1] <- 1
+    sm[2, 2] <- 1
+  }
+  if (sc == "13") {
+    # first trait active: 00 <-> 10
+    sm[1, 1] <- 1
+    sm[1, 3] <- 1
+    sm[3, 1] <- 1
+    sm[3, 3] <- 1
+  }
+  if (sc == "24") {
+    # first trait active: 01 <-> 11
+    sm[2, 2] <- 1
+    sm[2, 4] <- 1
+    sm[4, 2] <- 1
+    sm[4, 4] <- 1
+  }
+  if (sc == "34") {
+    # second trait active: 10 <-> 11
+    sm[3, 3] <- 1
+    sm[3, 4] <- 1
+    sm[4, 3] <- 1
+    sm[4, 4] <- 1
+  }
+  rownames(sm) <- c("00", "01", "10", "11")
+  colnames(sm) <- c("00", "01", "10", "11")
+
+  m <- model$model
+  semi <- matrix(0, nrow = nrow(m), ncol = ncol(m))
+  for (i in seq_len(nrow(m))) {
+    from <- model$observed[[model$states[i]]]
+    for (j in seq_len(ncol(m))) {
+      if (i == j) {
+        next
+      }
+      if (m[i, j] == 0) {
+        next
+      }
+      to <- model$observed[[model$states[j]]]
+      if (sm[from, to] == 0) {
+        next
+      }
+      semi[i, j] <- Q[i, j]
+    }
+  }
+  return(semi)
+}
+
 # semi_active_Q returns the semiactive Q
 # for a given scenario.
 semi_active_Q <- function(sc, Q) {
@@ -526,4 +592,29 @@ collapse_model <- function(obs) {
     stop("collapse_model: model cannot be collapsed")
   }
   return(model)
+}
+
+# reduce_matrix creates a new matrix without zero cols-rows.
+reduce_matrix <- function(m) {
+  n <- colnames(m)
+  states <- c()
+  for (i in seq_len(length(n))) {
+    if (any(m[i, ] != 0)) {
+      states <- c(states, n[i])
+    }
+  }
+  r <- matrix(0, ncol = length(states), nrow = length(states))
+  colnames(r) <- states
+  rownames(r) <- states
+  for (i in seq_len(length(states))) {
+    from <- states[i]
+    for (j in seq_len(length(states))) {
+      if (i == j) {
+        next
+      }
+      to <- states[j]
+      r[from, to] <- m[from, to]
+    }
+  }
+  return(r)
 }

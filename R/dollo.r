@@ -1,3 +1,45 @@
+# youngest_birth_node return the youngest node
+# for the birth of each state.
+youngest_birth_node <- function(t, enc, traits) {
+  youngest <- list()
+
+  # a single trait
+  if (traits == 1) {
+    youngest[[1]] <- birth_node_states(t, enc)
+    return(youngest)
+  }
+
+  # two traits
+  for (i in c(1:2)) {
+    et <- list()
+    for (j in seq_len(length(t$tip))) {
+      tp <- t$tip[j]
+      et[[tp]] <- list(
+        name = tp,
+        state = substr(enc[[tp]]$state, i, i)
+      )
+    }
+    youngest[[i]] <- birth_node_states(t, et)
+  }
+
+  return(youngest)
+}
+
+birth_node_states <- function(t, enc) {
+  nodes <- c()
+  for (i in c("0", "1")) {
+    ns <- rep(FALSE, length(t$parent))
+    for (j in seq_len(length(t$tip))) {
+      obs <- enc[[t$tip[j]]]$state
+      if (obs == i || obs == "p") {
+        ns[j] <- TRUE
+      }
+    }
+    nodes <- c(nodes, dollo(t, ns))
+  }
+  return(nodes)
+}
+
 # youngest_birth_event returns the youngest node
 # for the birth of each state.
 youngest_birth_event <- function(t, cond) {

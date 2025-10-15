@@ -85,6 +85,19 @@ birth_events <- function(t, youngest) {
   return(ev)
 }
 
+# set_root_prior sets the priors of the root
+# taking into account the birth events.
+set_root_prior <- function(t, model, root, births, youngest) {
+  obs_prior <- update_root(t, rep(1, 4), births, youngest)
+  names(obs_prior) <- c("00", "01", "10", "11")
+  prior <- rep(0, length(root))
+  for (i in seq_len(length(root))) {
+    obs <- model$observed[[model$states[i]]]
+    prior[i] <- root[i] * obs_prior[obs]
+  }
+  return(prior)
+}
+
 # update_root returns the root priors
 # taking into account the birth events.
 update_root <- function(t, root, births, youngest) {
