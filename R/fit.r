@@ -16,8 +16,9 @@
 #'   The second and third column contains the data,
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
-#' @param model A model build with `new_model()`.
-#'   By default it uses the independent model
+#' @param model A model build with `new_model()`
+#'   or `new_hidden_model()`.
+#'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -325,18 +326,9 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #'   with a fields `node` indicating the birth of the trait
 #'   and `age` indicating the time from the start of the edge
 #'   in which the event happens.
-#' @param model Model of evolution for the traits.
-#'   By default it uses the independent model ("IND").
-#'   Other valid values are "ARD"
-#'   or "xy" for a fully correlated model;
-#'   "ER" for a model in which both traits have equal rates
-#'   in any direction;
-#'   "ER2" for an equal rates model,
-#'   but rates are different for each trait;
-#'   "SYM" for the symmetric model
-#'   in which changes between states are equal;
-#'   "x" for a model in which trait x depends on y;
-#'   and "y" in which trait y depends on x.
+#' @param model A model build with `new_model()`
+#'   or `new_hidden_model()`.
+#'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -560,10 +552,9 @@ fit_fixed_births <- function(
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
 #' @param rate_mat Rate matrix for the traits with the full process.
-#' @param semi_mat Rate matrix for the traits with the semi-active process.
-#'   If it is NULL,
-#'   it will use the same parameter values
-#'   from the full process.
+#' @param model A model build with `new_model()`
+#'   or `new_hidden_model()`.
+#'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -576,14 +567,34 @@ fit_fixed_births <- function(
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_matrix <- function(
-    tree, data, rate_mat, semi_mat = NULL,
+    tree, data, rate_mat,
+    model = NULL,
     root = NULL, root_method = "prior", opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
-  cond <- init_conditionals(t, data, 2)
+  if (is.null(model)) {
+    model <- new_model("IND")
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+  }
+  if (is.null(rate_mat)) {
+    stop("fit_fixed_matrix: `rate_mat` must be a matrix")
+  }
+  if (nrow(rate_mat) != ncol(rate_mat)) {
+    stop("fit_fixed_matrix: `rate_mat` must be a square matrix")
+  }
+  if (nrow(rate_mat) != nrow(model$model)) {
+    stop("fit_fixed_matrix: `rate_mat` must have the same size as the `model`")
+  }
+
+  k <- 2
+
+  et <- encode_traits(t, data, 2)
+  cond <- set_conditionals(t, et, model)
 
   if (is.null(root)) {
     root <- rep(1, ncol(cond))
@@ -596,29 +607,7 @@ fit_fixed_matrix <- function(
     root <- rep(1, ncol(cond))
   }
 
-  if (is.null(rate_mat)) {
-    stop("fit_fixed_matrix: `rate_mat` must be a matrix")
-  }
-  if (nrow(rate_mat) != ncol(rate_mat)) {
-    stop("fit_fixed_matrix: `rate_mat` must be a square matrix")
-  }
-  if (nrow(rate_mat) != 4) {
-    stop("fit_fixed_matrix: `rate_mat` should be 4x4")
-  }
-
-  if (is.null(semi_mat)) {
-    semi_mat <- rate_mat
-  }
-  if (nrow(semi_mat) != ncol(semi_mat)) {
-    stop("fit_fixed_matrix: `semi_mat` must be a square matrix")
-  }
-  if (nrow(semi_mat) != 4) {
-    stop("fit_fixed_matrix: `semi_mat` should be 4x4")
-  }
-
-  k <- 2
-
-  youngest <- youngest_birth_event(t, cond)
+  youngest <- youngest_birth_node(t, et, 2)
   ev_prob <- 2 * log(prob_birth(t))
 
   # closure for the likelihood function
@@ -644,13 +633,13 @@ fit_fixed_matrix <- function(
       }
 
       # update root priors
-      root_prob <- update_root(t, root, births, youngest)
+      root_prob <- set_root_prior(t, model, root, births, youngest)
       if (all(root_prob == 0)) {
         return(Inf)
       }
 
       lk <- sinba_like(
-        t, rate_mat, semi_mat, births, xt, cond,
+        t, rate_mat, model, births, xt, cond,
         log(root_prob), root_method, ev_prob
       )
       return(-lk)
@@ -661,8 +650,7 @@ fit_fixed_matrix <- function(
     v <- 1e-06
     opts <- list(
       "algorithm" = "NLOPT_LN_SBPLX",
-      # set the upper bound using the number of replicates
-      xtol_abs = rep(v, 3),
+      xtol_abs = rep(v, k),
       maxeval = 10000
     )
   }
@@ -693,7 +681,6 @@ fit_fixed_matrix <- function(
   }
 
   q <- normalize_Q(rate_mat)
-  sq <- normalize_Q(semi_mat)
   births <- list()
   for (i in 1:2) {
     n <- get_node_by_len(t, res$solution[i], res$ev_node[i])
@@ -706,16 +693,45 @@ fit_fixed_matrix <- function(
     )
     births[[i]] <- b
   }
+
+  # retrieve the scenarios
+  root_states <- update_root(t, rep(1, 4), births, youngest)
+  root_names <- c("00", "01", "10", "11")
+  sc <- c()
+  for (i in seq_len(length(root_states))) {
+    if (root_states[i] == 0) {
+      next
+    }
+    has_prior <- FALSE
+    for (j in seq_len(length(root))) {
+      obs <- model$observed[[model$states[j]]]
+      if (obs != root_names[i]) {
+        next
+      }
+      if (root[j] != 0) {
+        has_prior <- TRUE
+      }
+    }
+    if (!has_prior) {
+      next
+    }
+    v <- scenario(root_states[i], 1)
+    if (res$solution[2] < res$solution[1]) {
+      # second trait is the oldest one
+      v <- scenario(root_states[i], 2)
+    }
+    sc <- c(sc, v)
+  }
+
   obj <- list(
     logLik = -res$objective,
     k = k,
-    model = "fixed",
+    model = model,
     Q = q,
-    semi_Q = sq,
     births = births,
-    states = c("00", "01", "10", "11"),
     root_prior = root,
     root_method = root_method,
+    scenarios = sc,
     data = data,
     tree = tree
   )

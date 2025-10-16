@@ -8,7 +8,7 @@ fit_fixed_matrix(
   tree,
   data,
   rate_mat,
-  semi_mat = NULL,
+  model = NULL,
   root = NULL,
   root_method = "prior",
   opts = NULL
@@ -25,10 +25,9 @@ Any other column will be ignored.}
 
 \item{rate_mat}{Rate matrix for the traits with the full process.}
 
-\item{semi_mat}{Rate matrix for the traits with the semi-active process.
-If it is NULL,
-it will use the same parameter values
-from the full process.}
+\item{model}{A model build with \code{new_model()}
+or \code{new_hidden_model()}.
+By default it uses the independent model.}
 
 \item{root}{Root prior probabilities.
 By default,

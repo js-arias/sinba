@@ -22,8 +22,9 @@ The second and third column contains the data,
 coded as 0 and 1.
 Any other column will be ignored.}
 
-\item{model}{A model build with \code{new_model()}.
-By default it uses the independent model}
+\item{model}{A model build with \code{new_model()}
+or \code{new_hidden_model()}.
+By default it uses the independent model.}
 
 \item{root}{Root prior probabilities.
 By default,
