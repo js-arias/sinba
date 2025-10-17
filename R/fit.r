@@ -266,32 +266,24 @@ print.fit_sinba <- function(x, digits = 6, ...) {
     age1 <- b1$age
     age2 <- b2$age
   }
-  if (age1 != age2) {
+  if ((age1 != age2) && (length(x$scenarios) > 0)) {
     cat("Semi-active process:\n")
-    if (length(x$scenarios) == 0) {
-      sQ <- x$semi_Q
+    for (i in seq_len(length(x$scenarios))) {
+      sc <- x$scenarios[i]
+      sQ <- build_semi_active_Q(x$model, sc, x$Q)
+      if (sc == "12") {
+        cat("second trait active: 00 <-> 01\n")
+      } else if (sc == "13") {
+        cat("first trait active: 00 <-> 10\n")
+      } else if (sc == "24") {
+        cat("first trait active: 01 <-> 11\n")
+      } else if (sc == "34") {
+        cat("second trait active: 10 <-> 11\n")
+      }
       rownames(sQ) <- states
       colnames(sQ) <- states
       sQ <- reduce_matrix(sQ)
       print(normalize_Q(sQ))
-    } else {
-      for (i in seq_len(length(x$scenarios))) {
-        sc <- x$scenarios[i]
-        sQ <- build_semi_active_Q(x$model, sc, x$Q)
-        if (sc == "12") {
-          cat("second trait active: 00 <-> 01\n")
-        } else if (sc == "13") {
-          cat("first trait active: 00 <-> 10\n")
-        } else if (sc == "24") {
-          cat("first trait active: 01 <-> 11\n")
-        } else if (sc == "34") {
-          cat("second trait active: 10 <-> 11\n")
-        }
-        rownames(sQ) <- states
-        colnames(sQ) <- states
-        sQ <- reduce_matrix(sQ)
-        print(normalize_Q(sQ))
-      }
     }
   }
 
@@ -353,7 +345,9 @@ fit_fixed_births <- function(
     model <- new_model("IND")
   }
   if (!inherits(model, "sinba_model")) {
-    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+    stop(
+      "fit_fixed_births: `model` must be an object of class \"sinba_model\"."
+    )
   }
 
   mQ <- model$model
@@ -433,7 +427,6 @@ fit_fixed_births <- function(
       logLik = -Inf,
       k = k,
       model = model,
-      Q = matrix(nrow = 4, ncol = 4),
       births = births,
       root_prior = root,
       root_method = root_method,
@@ -492,6 +485,13 @@ fit_fixed_births <- function(
   # retrieve the scenarios
   root_states <- update_root(t, rep(1, 4), births, youngest)
   root_names <- c("00", "01", "10", "11")
+  age1 <- phylo_node_age(tree, births[[1]]$node)
+  age2 <- phylo_node_age(tree, births[[1]]$node)
+  if (births[[1]]$node == births[[2]]$node) {
+    age1 <- b1$age
+    age2 <- b2$age
+  }
+
   sc <- c()
   for (i in seq_len(length(root_states))) {
     if (root_states[i] == 0) {
@@ -511,7 +511,7 @@ fit_fixed_births <- function(
       next
     }
     v <- scenario(root_states[i], 1)
-    if (res$solution[2] < res$solution[1]) {
+    if (age2 < age1) {
       # second trait is the oldest one
       v <- scenario(root_states[i], 2)
     }
@@ -579,7 +579,9 @@ fit_fixed_matrix <- function(
     model <- new_model("IND")
   }
   if (!inherits(model, "sinba_model")) {
-    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+    stop(
+      "fit_fixed_matrix: `model` must be an object of class \"sinba_model\"."
+    )
   }
   if (is.null(rate_mat)) {
     stop("fit_fixed_matrix: `rate_mat` must be a matrix")
@@ -761,10 +763,9 @@ fit_fixed_matrix <- function(
 #'   with a fields `node` indicating the birth of the trait
 #'   and `age` indicating the time from the start of the edge
 #'   in which the event happens.
-#' @param semi_mat Rate matrix for the traits with the semi-active process.
-#'   If it is NULL,
-#'   it will use the same parameter values
-#'   from the full process.
+#' @param model A model build with `new_model()`
+#'   or `new_hidden_model()`.
+#'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
@@ -775,13 +776,31 @@ fit_fixed_matrix <- function(
 #'   in which ancestral states are weighted by its own likelihood.
 fixed_sinba <- function(
     tree, data, rate_mat, births,
-    semi_mat = NULL, root = NULL, root_method = "prior") {
+    model = NULL,
+    root = NULL, root_method = "prior") {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
-  cond <- init_conditionals(t, data, 2)
+  if (is.null(model)) {
+    model <- new_model("IND")
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop("fixed_sinba: `model` must be an object of class \"sinba_model\".")
+  }
+  if (is.null(rate_mat)) {
+    stop("fixed_sinba: `rate_mat` must be a matrix")
+  }
+  if (nrow(rate_mat) != ncol(rate_mat)) {
+    stop("fixed_sinba: `rate_mat` must be a square matrix")
+  }
+  if (nrow(rate_mat) != nrow(model$model)) {
+    stop("fixed_sinba: `rate_mat` must have the same size as the `model`")
+  }
+
+  et <- encode_traits(t, data, 2)
+  cond <- set_conditionals(t, et, model)
 
   if (is.null(root)) {
     root <- rep(1, ncol(cond))
@@ -792,26 +811,6 @@ fixed_sinba <- function(
   root <- root / sum(root)
   if (root_method == "FitzJohn") {
     root <- rep(1, ncol(cond))
-  }
-
-  if (is.null(rate_mat)) {
-    stop("fixed_sinba: `rate_mat` must be a matrix")
-  }
-  if (nrow(rate_mat) != ncol(rate_mat)) {
-    stop("fixed_sinba: `rate_mat` must be a square matrix")
-  }
-  if (nrow(rate_mat) != 4) {
-    stop("fixed_sinba: `rate_mat` should be 4x4")
-  }
-
-  if (is.null(semi_mat)) {
-    semi_mat <- rate_mat
-  }
-  if (nrow(semi_mat) != ncol(semi_mat)) {
-    stop("fixed_sinba: `semi_mat` must be a square matrix")
-  }
-  if (nrow(semi_mat) != 4) {
-    stop("fixed_sinba: `semi_mat` should be 4x4")
   }
 
   if (is.null(births)) {
@@ -847,8 +846,8 @@ fixed_sinba <- function(
     if (!is_parent(t, b1$node, b2$node) && !(is_parent(t, b2$node, b1$node))) {
       obj <- list(
         logLik = -Inf,
+        model = model,
         Q = normalize_Q(rate_mat),
-        semi_Q = semi_mat,
         births = births,
         states = c("00", "01", "10", "11"),
         root_prior = root,
@@ -861,18 +860,17 @@ fixed_sinba <- function(
     }
   }
 
-  youngest <- youngest_birth_event(t, cond)
+  youngest <- youngest_birth_node(t, et, 2)
 
   # check for valid events
-  root_prob <- update_root(t, root, births, youngest)
-
+  root_prob <- set_root_prior(t, model, root, births, youngest)
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
   if (all(root_prob == 0)) {
     obj <- list(
       logLik = -Inf,
+      model = model,
       Q = normalize_Q(rate_mat),
-      semi_Q = semi_mat,
       births = births,
       states = c("00", "01", "10", "11"),
       root_prior = root,
@@ -888,18 +886,55 @@ fixed_sinba <- function(
 
   xt <- tree_to_cpp(t)
   lk <- sinba_like(
-    t, rate_mat, semi_mat, births, xt, cond,
+    t, rate_mat, model, births, xt, cond,
     log(root_prob), root_method, ev_prob
   )
 
+  # retrieve the scenarios
+  root_states <- update_root(t, rep(1, 4), births, youngest)
+  root_names <- c("00", "01", "10", "11")
+  age1 <- phylo_node_age(tree, births[[1]]$node)
+  age2 <- phylo_node_age(tree, births[[1]]$node)
+  if (births[[1]]$node == births[[2]]$node) {
+    age1 <- b1$age
+    age2 <- b2$age
+  }
+
+  sc <- c()
+  for (i in seq_len(length(root_states))) {
+    if (root_states[i] == 0) {
+      next
+    }
+    has_prior <- FALSE
+    for (j in seq_len(length(root))) {
+      obs <- model$observed[[model$states[j]]]
+      if (obs != root_names[i]) {
+        next
+      }
+      if (root[j] != 0) {
+        has_prior <- TRUE
+      }
+    }
+    if (!has_prior) {
+      next
+    }
+    v <- scenario(root_states[i], 1)
+    if (age2 < age1) {
+      # second trait is the oldest one
+      v <- scenario(root_states[i], 2)
+    }
+    sc <- c(sc, v)
+  }
+
   obj <- list(
     logLik = lk,
+    model = model,
     Q = normalize_Q(rate_mat),
-    semi_Q = semi_mat,
     births = births,
     states = c("00", "01", "10", "11"),
     root_prior = root,
     root_method = root_method,
+    scenarios = sc,
     data = data,
     tree = tree
   )
@@ -919,6 +954,9 @@ fixed_sinba <- function(
 #' @param ... Additional arguments are unused.
 print.fixed_sinba <- function(x, digits = 6, ...) {
   cat("Sinba: Fixed Rate Matrix\n")
+
+  states <- x$model$states
+
   cat(paste("Log-Likelihood = ", round(x$logLik, digits), "\n", sep = ""))
   cat("Birth events:\n")
   n <- colnames(x$data)
@@ -927,27 +965,49 @@ print.fixed_sinba <- function(x, digits = 6, ...) {
     b1$node, " time ", round(b1$age, digits), "\n",
     sep = ""
   ))
-  b3 <- x$births[[2]]
+  b2 <- x$births[[2]]
   cat(paste("- Trait ", n[3], " Node ",
-    b3$node, " time ", round(b3$age, digits), "\n",
+    b2$node, " time ", round(b2$age, digits), "\n",
     sep = ""
   ))
   cat("Rates:\n")
   Q <- x$Q
-  rownames(Q) <- x$states
-  colnames(Q) <- x$states
+  rownames(Q) <- states
+  colnames(Q) <- states
   print(Q)
-  cat("Semi active rate matrix:\n")
-  semi <- x$semi_Q
-  rownames(semi) <- x$states
-  colnames(semi) <- x$states
-  print(semi)
+  age1 <- phylo_node_age(x$tree, b1$node)
+  age2 <- phylo_node_age(x$tree, b2$node)
+  if (b1$node == b2$node) {
+    age1 <- b1$age
+    age2 <- b2$age
+  }
+  if ((age1 != age2) && (length(x$scenarios) > 0)) {
+    cat("Semi-active process:\n")
+    for (i in seq_len(length(x$scenarios))) {
+      sc <- x$scenarios[i]
+      sQ <- build_semi_active_Q(x$model, sc, x$Q)
+      if (sc == "12") {
+        cat("second trait active: 00 <-> 01\n")
+      } else if (sc == "13") {
+        cat("first trait active: 00 <-> 10\n")
+      } else if (sc == "24") {
+        cat("first trait active: 01 <-> 11\n")
+      } else if (sc == "34") {
+        cat("second trait active: 10 <-> 11\n")
+      }
+      rownames(sQ) <- states
+      colnames(sQ) <- states
+      sQ <- reduce_matrix(sQ)
+      print(normalize_Q(sQ))
+    }
+  }
+
   if (x$root_method == "FitzJohn") {
     cat("Root method: FitzJohn\n")
   } else {
     cat("Root prior:\n")
     root <- x$root_prior
-    names(root) <- x$states
+    names(root) <- states
     print(root)
   }
 }

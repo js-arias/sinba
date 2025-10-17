@@ -9,7 +9,7 @@ fixed_sinba(
   data,
   rate_mat,
   births,
-  semi_mat = NULL,
+  model = NULL,
   root = NULL,
   root_method = "prior"
 )
@@ -31,10 +31,9 @@ with a fields \code{node} indicating the birth of the trait
 and \code{age} indicating the time from the start of the edge
 in which the event happens.}
 
-\item{semi_mat}{Rate matrix for the traits with the semi-active process.
-If it is NULL,
-it will use the same parameter values
-from the full process.}
+\item{model}{A model build with \code{new_model()}
+or \code{new_hidden_model()}.
+By default it uses the independent model.}
 
 \item{root}{Root prior probabilities.
 By default,
