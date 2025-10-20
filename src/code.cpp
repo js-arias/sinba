@@ -252,6 +252,13 @@ cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc,
 
 				// then we calculate the conditional for the birth of the semi-active process.
 				len = second_age - first_age;
+				if (len == 0)
+				{
+					// simultaneous birth
+					// we move directly to the inactive state
+					from = conditional(tmp2, root_Q, first_age);
+					break;
+				}
 				doubles tmp1 = conditional(tmp2, semi_Q, len);
 
 				// finally we calculate the conditional for the inactive process.

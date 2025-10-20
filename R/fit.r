@@ -27,12 +27,17 @@
 #'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
 #'   method,
 #'   in which ancestral states are weighted by its own likelihood.
+#' @param single_birth If true,
+#'   it will set the birth of both traits in the same location
+#'   (reducing one parameter).
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(
     tree, data, model = NULL,
-    root = NULL, root_method = "prior", opts = NULL) {
+    root = NULL, root_method = "prior",
+    single_birth = FALSE,
+    opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -46,6 +51,9 @@ fit_sinba <- function(
   }
   mQ <- model$model
   k <- max(mQ) + 2
+  if (single_birth) {
+    k <- max(mQ) + 1
+  }
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -63,6 +71,10 @@ fit_sinba <- function(
 
   youngest <- youngest_birth_node(t, et, 2)
   ev_prob <- 2 * log(prob_birth(t))
+  transition_start <- 3
+  if (single_birth) {
+    transition_start <- 2
+  }
 
   # closure for the likelihood function
   like_func <- function(yn) {
@@ -72,19 +84,24 @@ fit_sinba <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p[3:length(p)] > 1000)) {
+      if (any(p[transition_start:length(p)] > 1000)) {
         return(Inf)
       }
 
       births <- list()
       for (i in 1:2) {
-        n <- get_node_by_len(t, p[i], yn[i])
+        j <- i
+        if (single_birth) {
+          j <- 1
+        }
+
+        n <- get_node_by_len(t, p[j], yn[j])
         if (n <= 0) {
           return(Inf)
         }
         b <- list(
           node = n,
-          age = t$br_len[n] + p[i] - t$age[n]
+          age = t$br_len[n] + p[j] - t$age[n]
         )
         births[[i]] <- b
       }
@@ -95,7 +112,7 @@ fit_sinba <- function(
         return(Inf)
       }
 
-      Q <- from_model_to_Q(mQ, p[3:length(p)])
+      Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
         log(root_prob), root_method, ev_prob
@@ -127,6 +144,13 @@ fit_sinba <- function(
       runif(1, max = t$age[e[1]]),
       runif(1, max = t$age[e[2]]), runif(k - 2)
     )
+    if (single_birth) {
+      max_age <- t$age[e[1]]
+      if (max_age > t$age[e[2]]) {
+        max_age <- t$age[e[2]]
+      }
+      par <- c(runif(1, max = max_age), runif(k - 1))
+    }
     r <- nloptr::nloptr(
       x0 = par,
       eval_f = fn,
@@ -138,17 +162,21 @@ fit_sinba <- function(
     }
   }
 
-  q <- from_model_to_Q(mQ, res$solution[3:length(res$solution)])
+  q <- from_model_to_Q(mQ, res$solution[transition_start:length(res$solution)])
   q <- normalize_Q(q)
   births <- list()
   for (i in 1:2) {
-    n <- get_node_by_len(t, res$solution[i], res$ev_node[i])
+    j <- i
+    if (single_birth) {
+      j <- 1
+    }
+    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
     if (n <= 0) {
       return(Inf)
     }
     b <- list(
       node = n,
-      age = t$br_len[n] + res$solution[i] - t$age[n]
+      age = t$br_len[n] + res$solution[j] - t$age[n]
     )
     births[[i]] <- b
   }
@@ -159,6 +187,9 @@ fit_sinba <- function(
   sc <- c()
   for (i in seq_len(length(root_states))) {
     if (root_states[i] == 0) {
+      next
+    }
+    if (single_birth) {
       next
     }
     has_prior <- FALSE

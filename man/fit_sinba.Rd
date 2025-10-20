@@ -10,6 +10,7 @@ fit_sinba(
   model = NULL,
   root = NULL,
   root_method = "prior",
+  single_birth = FALSE,
   opts = NULL
 )
 }
@@ -35,6 +36,10 @@ By default it use the root prior.
 If set as "FitzJohn" it will use the FitzJohn et al. (2009)
 method,
 in which ancestral states are weighted by its own likelihood.}
+
+\item{single_birth}{If true,
+it will set the birth of both traits in the same location
+(reducing one parameter).}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
