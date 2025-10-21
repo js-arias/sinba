@@ -4,7 +4,7 @@
 \alias{fixed_sinba_single}
 \title{Estimate the Likelihood for a Given Sinba Transition Matrix in a Single Trait}
 \usage{
-fixed_sinba_single(tree, data, rate_mat, birth, root = NULL)
+fixed_sinba_single(tree, data, rate_mat, birth, model = NULL, root = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -21,6 +21,9 @@ Any other column will be ignored.}
 indicated the birth of the trait,
 and \code{age} the time from the start of the edge
 in which the event happens.}
+
+\item{model}{A model build with \code{new_model()}
+or \code{new_hidden_model()}.}
 
 \item{root}{Root prior probabilities.
 By default,

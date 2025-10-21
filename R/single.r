@@ -33,7 +33,12 @@ fit_sinba_single <- function(
     model <- new_model(traits = 1)
   }
   if (!inherits(model, "sinba_model")) {
-    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+    stop(
+      "fit_sinba_single: `model` must be an object of class \"sinba_model\"."
+    )
+  }
+  if (model$traits != 1) {
+    stop("fit_sinba_single: `model` must be for a single trait.")
   }
   mQ <- model$model
   k <- max(mQ) + 1
@@ -249,16 +254,45 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
 #'   indicated the birth of the trait,
 #'   and `age` the time from the start of the edge
 #'   in which the event happens.
+#' @param model A model build with `new_model()`
+#'   or `new_hidden_model()`.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
-fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
+fixed_sinba_single <- function(
+    tree, data, rate_mat, birth,
+    model = NULL,
+    root = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba_single: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
-  cond <- init_conditionals(t, data, 1)
+  if (is.null(model)) {
+    model <- new_model(traits = 1)
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop(
+      "fixed_sinba_single: `model` must be an object of class \"sinba_model\"."
+    )
+  }
+  if (model$traits != 1) {
+    stop("fixed_sinba_single: `model` must be for a single trait.")
+  }
+  if (is.null(rate_mat)) {
+    stop("fixed_sinba_single: `rate_mat` must be a matrix")
+  }
+  if (nrow(rate_mat) != ncol(rate_mat)) {
+    stop("fixed_sinba_single: `rate_mat` must be a square matrix")
+  }
+  if (nrow(rate_mat) != nrow(model$model)) {
+    stop(
+      "fixed_sinba_single: `rate_mat` must have the same size as the `model`"
+    )
+  }
+
+  et <- encode_traits(t, data, 1)
+  cond <- set_conditionals(t, et, model)
 
   if (is.null(root)) {
     root <- rep(1, ncol(cond))
@@ -267,16 +301,6 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
     stop("fixed_sinba_single: invalid size for `root` vector.")
   }
   root <- root / sum(root)
-
-  if (is.null(rate_mat)) {
-    stop("fixed_sinba_single: `rate_mat` must be a matrix")
-  }
-  if (nrow(rate_mat) != ncol(rate_mat)) {
-    stop("fixed_sinba_single: `rate_mat` must be a square matrix")
-  }
-  if (nrow(rate_mat) != 2) {
-    stop("fixed_sinba_single: `rate_mat` should be 2x2")
-  }
 
   if (is.null(birth)) {
     stop("fixed_sinba_single: undefined `birth` event")
@@ -291,36 +315,28 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
     stop("fixed_sinba_singe: invalid value for field `age` of `birth`")
   }
 
+  youngest <- youngest_birth_node(t, et, 1)
+  y <- youngest[[1]]
+  obs_prior <- c(1, 1)
+  for (yn in seq_len(length(y))) {
+    if (y[yn] == birth$node) {
+      next
+    }
+    if (is_parent(t, y[yn], birth$node)) {
+      next
+    }
+    obs_prior[yn] <- 0
+  }
   ev_prob <- log(prob_birth(t))
 
-  # check for valid events
-  root_prob <- root
-  youngest <- youngest_birth_event(t, cond)
-  if (root[1] > 0) {
-    y <- youngest[[1]]
-    if (y[2] != birth$node) {
-      if (!is_parent(t, birth$node, y[2])) {
-        # invalid root state
-        root_prob[1] <- 0
-      }
-    }
-  }
-  if (root[2] > 0) {
-    y <- youngest[[1]]
-    if (y[1] != birth$node) {
-      if (!is_parent(t, birth$node, y[1])) {
-        # invalid root state
-        root_prob[2] <- 0
-      }
-    }
-  }
+  root_prob <- set_root_prior_single(model, root, obs_prior)
 
   if (all(root_prob == 0)) {
     obj <- list(
       logLik = -Inf,
+      model = model,
       Q = normalize_Q(rate_mat),
       birth = birth,
-      states = c(0, 1),
       root_prior = root,
       data = data,
       tree = tree
@@ -330,13 +346,15 @@ fixed_sinba_single <- function(tree, data, rate_mat, birth, root = NULL) {
   }
 
   xt <- tree_to_cpp(t)
-  lk <- sinba_single_like(t, rate_mat, cond, log(root_prob), birth, xt, ev_prob)
+  lk <- sinba_single_like(
+    t, rate_mat, model, birth, xt, cond,
+    log(root_prob), ev_prob
+  )
 
   obj <- list(
     logLik = lk,
     Q = normalize_Q(rate_mat),
     birth = birth,
-    states = c(0, 1),
     root_prior = root,
     data = data,
     tree = tree
