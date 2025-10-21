@@ -4,7 +4,7 @@
 \alias{fit_sinba_single}
 \title{Maximum Likelihood Estimation of the Sinba Model in a Single Trait}
 \usage{
-fit_sinba_single(tree, data, root = NULL, opts = NULL)
+fit_sinba_single(tree, data, model = NULL, root = NULL, opts = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -14,6 +14,9 @@ The first column should contain the taxon names,
 A second should contain the data,
 coded as 0 and 1.
 Any other column will be ignored.}
+
+\item{model}{A model build with \code{new_model()}
+or \code{new_hidden_model()}.}
 
 \item{root}{Root prior probabilities.
 By default,

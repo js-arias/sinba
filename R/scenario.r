@@ -98,6 +98,19 @@ set_root_prior <- function(t, model, root, births, youngest) {
   return(prior)
 }
 
+# set_root_prior_single sets the prior of the root
+# taking into account the birth events
+# for a single trait.
+set_root_prior_single <- function(model, root, obs_prior) {
+  names(obs_prior) <- c("0", "1")
+  prior <- rep(0, length(root))
+  for (i in seq_len(length(root))) {
+    obs <- model$observed[[model$states[i]]]
+    prior[i] <- root[i] * obs_prior[obs]
+  }
+  return(prior)
+}
+
 # update_root returns the root priors
 # taking into account the birth events.
 update_root <- function(t, root, births, youngest) {

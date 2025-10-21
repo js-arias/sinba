@@ -4,7 +4,7 @@
 \alias{new_model}
 \title{Build a Model Matrix}
 \usage{
-new_model(model = "")
+new_model(model = "", traits = 2)
 }
 \arguments{
 \item{model}{Model of evolution for the traits.
@@ -31,6 +31,10 @@ rates are correlated by the state of the other trait.
 In the "CMK" model,
 is like the symmetrical model,
 but changes of more than one state are allowed.}
+
+\item{traits}{The number of traits in the model.
+By default it is two.
+It can also be a single trait.}
 }
 \description{
 \code{new_model()} creates a new model matrix.

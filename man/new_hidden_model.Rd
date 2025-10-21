@@ -4,12 +4,16 @@
 \alias{new_hidden_model}
 \title{Create a New Model With Hidden States}
 \usage{
-new_hidden_model(states)
+new_hidden_model(states, traits = 2)
 }
 \arguments{
 \item{states}{A list with one or more elements,
 each element containing a trait state
 and its hidden states.}
+
+\item{traits}{The number of traits in the model.
+By default it is two.
+It can also be a single trait.}
 }
 \value{
 A model matrix with hidden states.

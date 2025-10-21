@@ -182,3 +182,34 @@ test_that("fixed_sinba works with hidden models", {
     model = hm
   ))
 })
+
+test_that("fit_sinba_single works", {
+  set.seed(6)
+
+  tree <- pbtree(n = 26, tip.label = LETTERS)
+  z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
+  data_z <- data.frame(LETTERS, z)
+
+  expect_no_error(fit_sinba_single(tree, data_z, model = new_model(traits = 1)))
+})
+
+test_that("fit_sinba_single works with hidden model", {
+  skip_on_cran()
+  set.seed(6)
+
+  tree <- pbtree(n = 26, tip.label = LETTERS)
+  z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
+  data_z <- data.frame(LETTERS, z)
+  hm <- new_hidden_model(
+    list(
+      list(
+        trait = "x",
+        state = 1,
+        hidden = c("a", "b", "c")
+      )
+    ),
+    traits = 1
+  )
+
+  expect_no_error(fit_sinba_single(tree, data_z, model = hm))
+})

@@ -28,7 +28,28 @@
 #'   In the "CMK" model,
 #'   is like the symmetrical model,
 #'   but changes of more than one state are allowed.
-new_model <- function(model = "") {
+#' @param traits The number of traits in the model.
+#'   By default it is two.
+#'   It can also be a single trait.
+new_model <- function(model = "", traits = 2) {
+  if (traits != 2) {
+    states <- c("x0", "x1")
+    observed <- list()
+    observed[[states[1]]] <- "0"
+    observed[[states[2]]] <- "1"
+    m <- matrix(0, nrow = 2, ncol = 2)
+    m[1, 2] <- 1
+    m[2, 1] <- 2
+    obj <- list(
+      name = "single trait",
+      model = m,
+      traits = 1,
+      states = states,
+      observed = observed
+    )
+    class(obj) <- "sinba_model"
+    return(obj)
+  }
   names <- c("IND", "CORR", "ER", "ER2", "ERs", "SYM", "sCORR", "x", "y", "CMK")
   if (!(model %in% names)) {
     model <- "IND"
@@ -180,12 +201,20 @@ model_matrix <- function(model = "") {
 #' @param states A list with one or more elements,
 #'   each element containing a trait state
 #'   and its hidden states.
+#' @param traits The number of traits in the model.
+#'   By default it is two.
+#'   It can also be a single trait.
 #'
 #' @return A model matrix with hidden states.
-new_hidden_model <- function(states) {
+new_hidden_model <- function(states, traits = 2) {
   if (is.null(states)) {
-    return(new_model())
+    return(new_model(), traits)
   }
+
+  if (traits != 2) {
+    return(single_hidden_model(states))
+  }
+
   # states with hidden states
   hs <- c(FALSE, FALSE, FALSE, FALSE)
   x_states <- c()
@@ -322,6 +351,94 @@ new_hidden_model <- function(states) {
     model = m,
     traits = 2,
     states = states,
+    observed = observed
+  )
+  class(obj) <- "sinba_model"
+  return(obj)
+}
+
+# single_hidden_model creates a model
+# for a single trait
+# with hidden states.
+single_hidden_model <- function(states) {
+  # states with hidden states
+  hs <- c(FALSE, FALSE)
+  x_states <- c()
+  for (e in states) {
+    if (is.null(e$trait)) {
+      next
+    }
+    if (e$trait != "x") {
+      next
+    }
+    if (is.null(e$state)) {
+      next
+    }
+    if (e$state != 0 && e$state != 1) {
+      next
+    }
+    if (length(e$hidden) <= 1) {
+      next
+    }
+    obs <- e$state + 1
+    if (hs[obs]) {
+      next
+    }
+    for (i in seq_len(length(e$hidden))) {
+      s <- sprintf("%s%d%s", e$trait, e$state, e$hidden[i])
+      x_states <- c(x_states, s)
+    }
+    hs[obs] <- TRUE
+  }
+
+  if (!any(hs)) {
+    return(new_model(traits = 1))
+  }
+  for (i in seq_len(length(hs))) {
+    if (hs[i]) {
+      next
+    }
+    if (i == 1) {
+      x_states <- c(x_states, "x0")
+    }
+    if (i == 2) {
+      x_states <- c(x_states, "x1")
+    }
+  }
+  x_states <- sort(x_states)
+
+  # combine individual states
+  observed <- list()
+  for (i in seq_len(length(x_states))) {
+    o <- ""
+    if (startsWith(x_states[i], "x0")) {
+      o <- "0"
+    } else {
+      o <- "1"
+    }
+    observed[[x_states[i]]] <- o
+  }
+
+  # build the matrix
+  m <- matrix(0, nrow = length(x_states), ncol = length(x_states))
+  p <- 1
+
+  for (i in seq_len(length(x_states))) {
+    for (j in seq_len(length(x_states))) {
+      if (i == j) {
+        next
+      }
+      m[i, j] <- p
+      p <- p + 1
+    }
+  }
+
+  m <- format_model_matrix(m)
+  obj <- list(
+    name = "single hidden",
+    model = m,
+    traits = 1,
+    states = x_states,
     observed = observed
   )
   class(obj) <- "sinba_model"

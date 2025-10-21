@@ -13,19 +13,34 @@
 #'   A second should contain the data,
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
+#' @param model A model build with `new_model()`
+#'   or `new_hidden_model()`.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
-fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
+fit_sinba_single <- function(
+    tree, data, model = NULL,
+    root = NULL, opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba_single: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
-  cond <- init_conditionals(t, data, 1)
+  if (is.null(model)) {
+    model <- new_model(traits = 1)
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+  }
+  mQ <- model$model
+  k <- max(mQ) + 1
+
+  et <- encode_traits(t, data, 1)
+  cond <- set_conditionals(t, et, model)
+
   if (is.null(root)) {
     root <- rep(1, ncol(cond))
   }
@@ -34,34 +49,26 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
   }
   root <- root / sum(root)
 
-  model <- matrix(c(
-    0, 1,
-    2, 0
-  ), byrow = TRUE, nrow = 2)
-
+  youngest <- youngest_birth_node(t, et, 1)
   ev_prob <- log(prob_birth(t))
-
-  youngest <- youngest_birth_event(t, cond)
 
   # closure for the likelihood function
   like_func <- function(yn) {
-    root_prob <- root
-    if (root[1] > 0) {
-      y <- youngest[[1]]
-      if (y[2] != yn) {
-        if (!is_parent(t, yn, y[2])) {
-          root_prob[1] <- 0
-        }
+    obs_prior <- c(1, 1)
+    y <- youngest[[1]]
+    if (y[2] != yn) {
+      if (!is_parent(t, yn, y[2])) {
+        obs_prior[1] <- 0
       }
     }
-    if (root[2] > 0) {
-      y <- youngest[[1]]
-      if (y[1] != yn) {
-        if (!is_parent(t, yn, y[1])) {
-          root_prob[2] <- 0
-        }
+    y <- youngest[[1]]
+    if (y[1] != yn) {
+      if (!is_parent(t, yn, y[1])) {
+        obs_prior[2] <- 0
       }
     }
+    root_prob <- set_root_prior_single(model, root, obs_prior)
+
     max_len <- t$age[yn]
     xt <- tree_to_cpp(t)
     log_root <- log(root_prob)
@@ -84,8 +91,11 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
         node = n,
         age = t$br_len[n] + p[1] - t$age[n]
       )
-      Q <- from_model_to_Q(model, p[2:length(p)])
-      lk <- sinba_single_like(t, Q, cond, log_root, birth, xt, ev_prob)
+      Q <- from_model_to_Q(mQ, p[2:length(p)])
+      lk <- sinba_single_like(
+        t, Q, model, birth, xt, cond,
+        log_root, ev_prob
+      )
       return(-lk)
     })
   }
@@ -94,8 +104,7 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
     v <- 1e-06
     opts <- list(
       "algorithm" = "NLOPT_LN_SBPLX",
-      # set the upper bound using the number of replicates
-      xtol_abs = rep(v, 3),
+      xtol_abs = rep(v, k),
       maxeval = 10000
     )
   }
@@ -113,7 +122,7 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
     }
 
     fn <- like_func(yn)
-    par <- c(runif(1, max = t$age[yn]), runif(2))
+    par <- c(runif(1, max = t$age[yn]), runif(max(mQ)))
     res <- nloptr::nloptr(
       x0 = par,
       eval_f = fn,
@@ -126,7 +135,7 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
     # for example ((a,(a, a)),(b,(b, b)))
     for (yn in y) {
       fn <- like_func(yn)
-      par <- c(runif(1, max = t$age[yn]), runif(2))
+      par <- c(runif(1, max = t$age[yn]), runif(max(mQ)))
       r <- nloptr::nloptr(
         x0 = par,
         eval_f = fn,
@@ -139,7 +148,7 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
     }
   }
 
-  q <- from_model_to_Q(model, res$solution[2:length(res$solution)])
+  q <- from_model_to_Q(mQ, res$solution[2:length(res$solution)])
   q <- normalize_Q(q)
   n <- get_node_by_len(t, res$solution[1], res$yn)
   birth <- list(
@@ -148,10 +157,10 @@ fit_sinba_single <- function(tree, data, root = NULL, opts = NULL) {
   )
   obj <- list(
     logLik = -res$objective,
-    k = 3, # two rates and a birth event
+    k = k,
+    model = model,
     Q = q,
     birth = birth,
-    states = c(0, 1),
     root_prior = root,
     data = data,
     tree = tree
@@ -190,6 +199,15 @@ logLik.fit_sinba_single <- function(object, ...) {
 #' @param ... Additional arguments are unused.
 print.fit_sinba_single <- function(x, digits = 6, ...) {
   cat("Single Sinba: Fit\n")
+
+  states <- x$model$states
+  mm <- x$model$model
+  rownames(mm) <- states
+  colnames(mm) <- states
+  cat("Model:\n")
+  print(mm)
+  cat(paste("Free parameters = ", x$k, ".\n", sep = ""))
+
   aic <- 2 * x$k - 2 * x$logLik
   aicc <- aic + (2 * x$k * x$k + 2 * x$k) / (length(x$tree$tip.label) - x$k - 1)
   fit <- c(x$logLik, aic, aicc)
@@ -201,12 +219,12 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
   cat(paste("- Node ", b$node, " time ", round(b$age, digits), "\n", sep = ""))
   cat("Rates:\n")
   Q <- x$Q
-  rownames(Q) <- c(0, 1)
-  colnames(Q) <- c(0, 1)
+  rownames(Q) <- states
+  colnames(Q) <- states
   print(Q)
   cat("Root prior:\n")
   root <- x$root_prior
-  names(root) <- c(0, 1)
+  names(root) <- states
   print(root)
 }
 
@@ -356,7 +374,9 @@ print.fixed_sinba_single <- function(x, digits = 6, ...) {
 
 # sinba_single calculates the likelihood of a single trait
 # under the sinba model.
-sinba_single_like <- function(t, Q, cond, root, birth, xt, ev_prob) {
+sinba_single_like <- function(
+    t, Q, model, birth,
+    xt, cond, root, ev_prob) {
   # make sure the Q matrix is valid
   Q <- normalize_Q(Q)
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
