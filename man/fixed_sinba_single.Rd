@@ -4,7 +4,15 @@
 \alias{fixed_sinba_single}
 \title{Estimate the Likelihood for a Given Sinba Transition Matrix in a Single Trait}
 \usage{
-fixed_sinba_single(tree, data, rate_mat, birth, model = NULL, root = NULL)
+fixed_sinba_single(
+  tree,
+  data,
+  rate_mat,
+  birth,
+  model = NULL,
+  root = NULL,
+  root_method = "prior"
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -28,6 +36,12 @@ or \code{new_hidden_model()}.}
 \item{root}{Root prior probabilities.
 By default,
 all states will have the same probability.}
+
+\item{root_method}{Method for root calculation at the root.
+By default it use the root prior.
+If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+method,
+in which ancestral states are weighted by its own likelihood.}
 }
 \description{
 \code{fixed_sinba_single()} calculates the likelihood

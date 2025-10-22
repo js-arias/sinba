@@ -18,12 +18,18 @@
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_sinba_single <- function(
     tree, data, model = NULL,
-    root = NULL, opts = NULL) {
+    root = NULL, root_method = "prior",
+    opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba_single: `tree` must be an object of class \"phylo\".")
   }
@@ -53,6 +59,9 @@ fit_sinba_single <- function(
     stop("fit_sinba_single: invalid size for `root` vector.")
   }
   root <- root / sum(root)
+  if (root_method == "FitzJohn") {
+    root <- rep(1, ncol(cond))
+  }
 
   youngest <- youngest_birth_node(t, et, 1)
   ev_prob <- log(prob_birth(t))
@@ -99,7 +108,7 @@ fit_sinba_single <- function(
       Q <- from_model_to_Q(mQ, p[2:length(p)])
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
-        log_root, ev_prob
+        log_root, root_method, ev_prob
       )
       return(-lk)
     })
@@ -259,10 +268,15 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
 #' @param root Root prior probabilities.
 #'   By default,
 #'   all states will have the same probability.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use the root prior.
+#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
+#'   method,
+#'   in which ancestral states are weighted by its own likelihood.
 fixed_sinba_single <- function(
     tree, data, rate_mat, birth,
     model = NULL,
-    root = NULL) {
+    root = NULL, root_method = "prior") {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba_single: `tree` must be an object of class \"phylo\".")
   }
@@ -301,6 +315,9 @@ fixed_sinba_single <- function(
     stop("fixed_sinba_single: invalid size for `root` vector.")
   }
   root <- root / sum(root)
+  if (root_method == "FitzJohn") {
+    root <- rep(1, ncol(cond))
+  }
 
   if (is.null(birth)) {
     stop("fixed_sinba_single: undefined `birth` event")
@@ -348,7 +365,7 @@ fixed_sinba_single <- function(
   xt <- tree_to_cpp(t)
   lk <- sinba_single_like(
     t, rate_mat, model, birth, xt, cond,
-    log(root_prob), ev_prob
+    log(root_prob), root_method, ev_prob
   )
 
   obj <- list(
@@ -394,7 +411,7 @@ print.fixed_sinba_single <- function(x, digits = 6, ...) {
 # under the sinba model.
 sinba_single_like <- function(
     t, Q, model, birth,
-    xt, cond, root, ev_prob) {
+    xt, cond, root, root_method, ev_prob) {
   # make sure the Q matrix is valid
   Q <- normalize_Q(Q)
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
@@ -408,6 +425,14 @@ sinba_single_like <- function(
   )
   likes <- l[t$root_id, ] + root
   mx <- max(likes)
+  if (root_method == "FitzJohn") {
+    l <- exp(likes - mx)
+    d <- sum(l)
+    for (i in seq_len(length(l))) {
+      lk <- lk + l[i] * l[i] / d
+    }
+    return(log(lk) + ev_prob + mx)
+  }
   lk <- log(sum(exp(likes - mx))) + ev_prob + mx
   return(lk)
 }
