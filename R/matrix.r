@@ -446,6 +446,122 @@ single_hidden_model <- function(states) {
 }
 
 #' @export
+#' @title Create a New Model With Hidden Rates
+#'
+#' @description
+#' `new_rates_model()` creates a new model matrix
+#' with hidden rates.
+#'
+#' @param model Model of evolution for the traits.
+#'   By default it returns the Pagel's independent model ("IND")
+#'   (i.e., this is equivalent to using two Q matrices).
+#'   The "CORR" model is the Pagel's correlated model,
+#'   in which each transition has a different parameter.
+#'   In the "ER" model both traits have equal rates
+#'   in any direction;
+#'   the "ER2" model also has equal rates,
+#'   but rates are different for each trait;
+#'   in the "ERs" model the rates of state transitions are equal
+#'   but can be different depending on the state.
+#'   If the "SYM" model changes between states are equal.
+#'   There a two full dependant models,
+#'   "x" for a model in which trait x
+#'   (the first trait)
+#'   depends on y;
+#'   and "y" in which trait y
+#'   (the second trait)
+#'   depends on x.
+#'   In the "sCORR" model,
+#'   rates are correlated by the state of the other trait.
+#'   In the "CMK" model,
+#'   is like the symmetrical model,
+#'   but changes of more than one state are allowed.
+#' @param rates The labels to identify the rates.
+#' @param traits The number of traits in the model.
+#'   By default it is two.
+#'   It can also be a single trait.
+new_rates_model <- function(model = "", rates = NULL, traits = 2) {
+  if (length(rates) < 2) {
+    return(new_model(model, traits))
+  }
+
+  names <- c("IND", "CORR", "ER", "ER2", "ERs", "SYM", "sCORR", "x", "y", "CMK")
+  if (!(model %in% names)) {
+    model <- "IND"
+  }
+  states <- rep(0, 4 * length(rates))
+  base <- model_matrix(model)
+  if (traits != 2) {
+    states <- rep(0, 2 * length(rates))
+    base <- matrix(0, nrow = 2, ncol = 2)
+    base[1, 2] <- 1
+    base[2, 1] <- 2
+    if (model == "ER") {
+      base[2, 1] <- 1
+    }
+    traits <- 1
+  }
+  m <- matrix(0, nrow = length(states), ncol = length(states))
+
+  # state transitions
+  for (i in seq_len(length(rates))) {
+    mx <- max(m)
+    offset <- (i - 1) * nrow(base)
+    for (j in seq_len(nrow(base))) {
+      for (k in seq_len(nrow(base))) {
+        v <- base[j, k]
+        if (v > 0) {
+          v <- v + mx
+        }
+        m[j + offset, k + offset] <- v
+      }
+    }
+  }
+
+  # rate transitions
+  rt <- max(m) + 1
+  for (i in seq_len(length(rates))) {
+    off_i <- (i - 1) * nrow(base)
+    for (j in seq_len(length(rates))) {
+      if (i == j) {
+        next
+      }
+      off_j <- (j - 1) * nrow(base)
+      for (k in seq_len(nrow(base))) {
+        m[k + off_i, k + off_j] <- rt
+      }
+    }
+  }
+
+  obs <- c("00", "01", "10", "11")
+  sts <- c("x0,y0", "x0,y1", "x1,y0", "x1,y1")
+  if (traits != 2) {
+    obs <- c("0", "1")
+    sts <- c("x0", "x1")
+  }
+  states <- c()
+  observed <- list()
+  for (i in seq_len(length(rates))) {
+    for (j in seq_len(length(obs))) {
+      s <- sprintf("%s[%s]", sts[j], rates[i])
+      states <- c(states, s)
+      observed[[s]] <- obs[j]
+    }
+  }
+
+  m <- format_model_matrix(m)
+  obj <- list(
+    name = "hidden rates",
+    model = m,
+    traits = traits,
+    states = states,
+    observed = observed
+  )
+  class(obj) <- "sinba_model"
+  return(obj)
+}
+
+#' @export
 #' @title Add a New Parameter to a Model
 #'
 #' @description
