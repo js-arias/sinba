@@ -16,8 +16,9 @@
 #'   The second and third column contains the data,
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
-#' @param model A model build with `new_model()`
-#'   or `new_hidden_model()`.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
@@ -349,8 +350,9 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #'   with a fields `node` indicating the birth of the trait
 #'   and `age` indicating the time from the start of the edge
 #'   in which the event happens.
-#' @param model A model build with `new_model()`
-#'   or `new_hidden_model()`.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
@@ -583,8 +585,9 @@ fit_fixed_births <- function(
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
 #' @param rate_mat Rate matrix for the traits with the full process.
-#' @param model A model build with `new_model()`
-#'   or `new_hidden_model()`.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,
@@ -794,8 +797,9 @@ fit_fixed_matrix <- function(
 #'   with a fields `node` indicating the birth of the trait
 #'   and `age` indicating the time from the start of the edge
 #'   in which the event happens.
-#' @param model A model build with `new_model()`
-#'   or `new_hidden_model()`.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,

@@ -29,8 +29,9 @@ with a fields \code{node} indicating the birth of the trait
 and \code{age} indicating the time from the start of the edge
 in which the event happens.}
 
-\item{model}{A model build with \code{new_model()}
-or \code{new_hidden_model()}.
+\item{model}{A model build with \code{new_model()},
+\code{new_hidden_model()},
+or \code{new_rates_model()}.
 By default it uses the independent model.}
 
 \item{root}{Root prior probabilities.

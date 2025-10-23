@@ -15,8 +15,9 @@
 #'   The second and third column contains the data,
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
-#' @param model A model build with `new_model()`
-#'   or `new_hidden_model()`.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param root Root prior probabilities.
 #'   By default,

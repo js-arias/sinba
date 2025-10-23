@@ -596,6 +596,90 @@ model_add <- function(model, cell) {
 }
 
 #' @export
+#' @title Removes Parameters for Unobserved States.
+#'
+#' @description
+#' `model_collapse()` removes all unobserved states
+#' from a model matrix.
+#' It returns an error if the removal produces
+#' a full inactive matrix.
+#'
+#' @param model A model definition as build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
+#'   The model must be defined for two traits.
+#' @param tree A phylogenetic trees of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+model_collapse <- function(model, tree, data) {
+  if (!inherits(tree, "phylo")) {
+    stop("model_collapse: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  if (!inherits(model, "sinba_model")) {
+    stop("model_collapse: `model` must be an object of class \"sinba_model\".")
+  }
+  if (model$traits != 2) {
+    stop("model_collapse: `model` must be defined for two traits.")
+  }
+
+  et <- encode_traits(t, data, 2)
+  obs <- c(FALSE, FALSE, FALSE, FALSE)
+  for (i in seq_len(length(t$tip))) {
+    if (all(obs)) {
+      break
+    }
+    o <- et[[t$tip[i]]]$state
+    if (o == "00") {
+      obs[1] <- TRUE
+    } else if (o == "01") {
+      obs[2] <- TRUE
+    } else if (o == "10") {
+      obs[3] <- TRUE
+    } else if (o == "11") {
+      obs[4] <- TRUE
+    } else if (obs == "?0" || obs == "p0") {
+      obs[1] <- TRUE
+      obs[3] <- TRUE
+    } else if (obs == "?1" || obs == "p1") {
+      obs[2] <- TRUE
+      obs[4] <- TRUE
+    } else if (obs == "0?" || obs == "0p") {
+      obs[1] <- TRUE
+      obs[2] <- TRUE
+    } else if (obs == "1?" || obs == "1p") {
+      obs[3] <- TRUE
+      obs[4] <- TRUE
+    } else if (obs == "??" || obs == "p?" || obs == "?p" || obs == "pp") {
+      obs <- c(TRUE, TRUE, TRUE, TRUE)
+    }
+  }
+  if (all(obs)) {
+    return(model)
+  }
+  names(obs) <- c("00", "01", "10", "11")
+  m <- model$model
+  for (i in seq_len(nrow(m))) {
+    o <- model$observed[[model$states[i]]]
+    if (obs[o]) {
+      next
+    }
+    m[i, ] <- 0
+    m[, i] <- 0
+  }
+  m <- format_model_matrix(m)
+  if (max(m) == 0) {
+    stop("model_collapse: model cannot be collapsed")
+  }
+  model$model <- m
+  return(model)
+}
+
+#' @export
 #' @title Make Equivalent Two or More Parameters
 #'
 #' @description
@@ -806,23 +890,6 @@ format_model_matrix <- function(model) {
       }
       model[i, j] <- x
     }
-  }
-  return(model)
-}
-
-# collapse_model removes parameters from unobserved states.
-collapse_model <- function(obs) {
-  model <- model_matrix("ARD")
-  for (i in seq_len(length(obs))) {
-    if (obs[i]) {
-      next
-    }
-    model[i, ] <- 0
-    model[, i] <- 0
-  }
-  model <- format_model_matrix(model)
-  if (max(model) == 0) {
-    stop("collapse_model: model cannot be collapsed")
   }
   return(model)
 }

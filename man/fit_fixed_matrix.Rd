@@ -25,8 +25,9 @@ Any other column will be ignored.}
 
 \item{rate_mat}{Rate matrix for the traits with the full process.}
 
-\item{model}{A model build with \code{new_model()}
-or \code{new_hidden_model()}.
+\item{model}{A model build with \code{new_model()},
+\code{new_hidden_model()},
+or \code{new_rates_model()}.
 By default it uses the independent model.}
 
 \item{root}{Root prior probabilities.

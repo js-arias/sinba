@@ -22,8 +22,10 @@ A second should contain the data,
 coded as 0 and 1.
 Any other column will be ignored.}
 
-\item{model}{A model build with \code{new_model()}
-or \code{new_hidden_model()}.}
+\item{model}{A model build with \code{new_model()},
+\code{new_hidden_model()},
+or \code{new_rates_model()}.
+The model must be defined for a single trait.}
 
 \item{root}{Root prior probabilities.
 By default,
