@@ -530,6 +530,7 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
       for (k in seq_len(nrow(base))) {
         m[k + off_i, k + off_j] <- rt
       }
+      rt <- rt + 1
     }
   }
 
