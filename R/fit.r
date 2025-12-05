@@ -20,14 +20,9 @@
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
-#' @param root Root prior probabilities.
-#'   By default,
-#'   all states will have the same probability.
-#' @param root_method Method for root calculation at the root.
-#'   By default it use the root prior.
-#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
-#'   method,
-#'   in which ancestral states are weighted by its own likelihood.
+#' @param ev_prob set the probability of a birth event.
+#'   By default is 1
+#'   (i.e., we have observed different states in the traits).
 #' @param single_birth If true,
 #'   it will set the birth of both traits in the same location
 #'   (reducing one parameter).
@@ -36,8 +31,8 @@
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(
     tree, data, model = NULL,
-    root = NULL, root_method = "prior",
     single_birth = FALSE,
+    ev_prob = 1,
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
@@ -59,26 +54,19 @@ fit_sinba <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  if (is.null(root)) {
-    root <- rep(1, ncol(cond))
-  }
-  if (length(root) != ncol(cond)) {
-    stop("fit_sinba: invalid size for `root` vector.")
-  }
-  root <- root / sum(root)
-  if (root_method == "FitzJohn") {
-    root <- rep(1, ncol(cond))
-  }
+  root <- c("00", "01", "10", "11")
 
-  youngest <- youngest_birth_node(t, et, 2)
-  ev_prob <- 2 * log(prob_birth(t))
+  ev_prob <- 2 * log(ev_prob)
+
+  # separate birth parameters
+  # from transition (traditional) parameters
   transition_start <- 3
   if (single_birth) {
     transition_start <- 2
   }
 
   # closure for the likelihood function
-  like_func <- function(yn) {
+  like_func <- function(yn, r) {
     xt <- tree_to_cpp(t)
 
     return(function(p) {
@@ -107,16 +95,10 @@ fit_sinba <- function(
         births[[i]] <- b
       }
 
-      # update root priors
-      root_prob <- set_root_prior(t, model, root, births, youngest)
-      if (all(root_prob == 0)) {
-        return(Inf)
-      }
-
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        log(root_prob), root_method, ev_prob
+        r, ev_prob
       )
       return(-lk)
     })
@@ -134,100 +116,93 @@ fit_sinba <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
-  # check all possible birth events
-  ev <- birth_events(t, youngest)
-
-  res <- list(objective = Inf)
-  for (i in sample(seq_len(length(ev)))) {
-    e <- ev[[i]]
-    fn <- like_func(e)
-    par <- c(
-      runif(1, max = t$age[e[1]]),
-      runif(1, max = t$age[e[2]]), runif(k - 2)
-    )
-    if (single_birth) {
-      max_age <- t$age[e[1]]
-      if (max_age > t$age[e[2]]) {
-        max_age <- t$age[e[2]]
+  res <- list()
+  res[[1]] <- list(objective = Inf)
+  for (r in sample(seq_len(length(root)))) {
+    youngest <- youngest_birth_event(t, et, root[r])
+    # check all possible birth events
+    ev <- birth_events(t, youngest)
+    for (i in sample(seq_len(length(ev)))) {
+      e <- ev[[i]]
+      fn <- like_func(e, r)
+      par <- c(
+        runif(1, max = t$age[e[1]]),
+        runif(1, max = t$age[e[2]]), runif(k - 2)
+      )
+      if (single_birth) {
+        max_age <- t$age[e[1]]
+        if (max_age > t$age[e[2]]) {
+          max_age <- t$age[e[2]]
+        }
+        par <- c(runif(1, max = max_age), runif(k - 1))
       }
-      par <- c(runif(1, max = max_age), runif(k - 1))
-    }
-    r <- nloptr::nloptr(
-      x0 = par,
-      eval_f = fn,
-      opts = opts
-    )
-    if (r$objective < res$objective) {
-      res <- r
-      res$ev_nodes <- e
+      rr <- nloptr::nloptr(
+        x0 = par,
+        eval_f = fn,
+        opts = opts
+      )
+      if (rr$objective < res[[1]]$objective) {
+        rr$root <- r
+        rr$ev_nodes <- e
+        res <- list()
+        res[[1]] <- rr
+      } else if (rr$objective == res[[1]]$objective) {
+        rr$root <- r
+        rr$ev_nodes <- e
+        res[[length(res) + 1]] <- rr
+      }
     }
   }
 
-  q <- from_model_to_Q(mQ, res$solution[transition_start:length(res$solution)])
-  q <- normalize_Q(q)
-  births <- list()
-  for (i in 1:2) {
-    j <- i
-    if (single_birth) {
-      j <- 1
+  to_ret <- list()
+  for (i in seq_len(length(res))) {
+    rr <- res[[i]]
+    q <- from_model_to_Q(mQ, rr$solution[transition_start:length(rr$solution)])
+    q <- normalize_Q(q)
+    births <- list()
+    for (i in 1:2) {
+      j <- i
+      if (single_birth) {
+        j <- 1
+      }
+      n <- get_node_by_len(t, rr$solution[j], rr$ev_node[j])
+      if (n <= 0) {
+        return(Inf)
+      }
+      b <- list(
+        node = n,
+        age = t$br_len[n] + rr$solution[j] - t$age[n]
+      )
+      births[[i]] <- b
     }
-    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
-    if (n <= 0) {
-      return(Inf)
+    root_state <- root[rr$root]
+
+    # retrieve the scenario
+    sc <- NULL
+    if (!single_birth) {
+      v <- scenario(rr$root, 1)
+      if (rr$solution[2] < rr$solution[1]) {
+        # second trait is the oldest one
+        v <- scenario(rr$root, 2)
+      }
+      sc <- v
     }
-    b <- list(
-      node = n,
-      age = t$br_len[n] + res$solution[j] - t$age[n]
+
+    obj <- list(
+      logLik = -rr$objective,
+      k = k,
+      model = model,
+      Q = q,
+      births = births,
+      root = root_state,
+      scenario = sc,
+      data = data,
+      tree = tree
     )
-    births[[i]] <- b
+    class(obj) <- "fit_sinba"
+    to_ret[[length(to_ret) + 1]] <- obj
   }
-
-  # retrieve the scenarios
-  root_states <- update_root(t, rep(1, 4), births, youngest)
-  root_names <- c("00", "01", "10", "11")
-  sc <- c()
-  for (i in seq_len(length(root_states))) {
-    if (root_states[i] == 0) {
-      next
-    }
-    if (single_birth) {
-      next
-    }
-    has_prior <- FALSE
-    for (j in seq_len(length(root))) {
-      obs <- model$observed[[model$states[j]]]
-      if (obs != root_names[i]) {
-        next
-      }
-      if (root[j] != 0) {
-        has_prior <- TRUE
-      }
-    }
-    if (!has_prior) {
-      next
-    }
-    v <- scenario(root_states[i], 1)
-    if (res$solution[2] < res$solution[1]) {
-      # second trait is the oldest one
-      v <- scenario(root_states[i], 2)
-    }
-    sc <- c(sc, v)
-  }
-
-  obj <- list(
-    logLik = -res$objective,
-    k = k,
-    model = model,
-    Q = q,
-    births = births,
-    root_prior = root,
-    root_method = root_method,
-    scenarios = sc,
-    data = data,
-    tree = tree
-  )
-  class(obj) <- "fit_sinba"
-  return(obj)
+  return(to_ret)
 }
 
 #' @export
@@ -275,6 +250,8 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   names(fit) <- c("logLik", "AIC", "AICc")
   print(fit)
 
+  cat("Root state: ", x$root, "\n", sep = "")
+
   cat("Birth events:\n")
   n <- colnames(x$data)
   b1 <- x$births[[1]]
@@ -317,15 +294,6 @@ print.fit_sinba <- function(x, digits = 6, ...) {
       sQ <- reduce_matrix(sQ)
       print(normalize_Q(sQ))
     }
-  }
-
-  if (x$root_method == "FitzJohn") {
-    cat("Root method: FitzJohn\n")
-  } else {
-    cat("Root prior:\n")
-    root <- x$root_prior
-    names(root) <- states
-    print(root)
   }
 }
 
@@ -1050,95 +1018,75 @@ print.fixed_sinba <- function(x, digits = 6, ...) {
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(
-    t, Q, model, births, xt, cond,
-    root_prior, root_method, ev_prob) {
+    t, Q, model, births, xt, cond, root, ev_prob) {
   Q <- normalize_Q(Q)
 
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
 
-  likes <- c()
-  for (r in seq_len(length(root_prior))) {
-    if (is.infinite(root_prior[r])) {
-      next
-    }
+  b1 <- births[[1]]
+  b2 <- births[[2]]
 
-    b1 <- births[[1]]
-    b2 <- births[[2]]
+  ev <- list()
+  n1 <- b1$node
+  n2 <- b2$node
+  a1 <- t$ages[n1]
+  a2 <- t$ages[n2]
+  if (n1 == n2) {
+    a1 <- b1$age
+    a2 <- b2$age
+  }
 
-    ev <- list()
-    n1 <- b1$node
-    n2 <- b2$node
-    a1 <- t$ages[n1]
-    a2 <- t$ages[n2]
-    if (n1 == n2) {
-      a1 <- b1$age
-      a2 <- b2$age
-    }
-
-    if (a1 < a2) {
-      # first trait is the oldest one
-      sc <- scenario(r, 1)
-      semi <- build_semi_active_Q(model, sc, Q)
-      semi <- normalize_Q(semi)
-      ev <- list(
-        first = list(
-          # birth of trait 1
-          node = n1,
-          age = b1$age,
-          trait = 1,
-          Q = semi
-        ),
-        second = list(
-          # birth of trait 2
-          node = n2,
-          age = b2$age,
-          trait = 2,
-          Q = Q
-        )
+  if (a1 < a2) {
+    # first trait is the oldest one
+    sc <- scenario(root, 1)
+    semi <- build_semi_active_Q(model, sc, Q)
+    semi <- normalize_Q(semi)
+    ev <- list(
+      first = list(
+        # birth of trait 1
+        node = n1,
+        age = b1$age,
+        trait = 1,
+        Q = semi
+      ),
+      second = list(
+        # birth of trait 2
+        node = n2,
+        age = b2$age,
+        trait = 2,
+        Q = Q
       )
-    } else {
-      # second trait is the oldest one
-      sc <- scenario(r, 2)
-      semi <- build_semi_active_Q(model, sc, Q)
-      semi <- normalize_Q(semi)
-      ev <- list(
-        first = list(
-          # birth of trait 2
-          node = n2,
-          age = b2$age,
-          trait = 2,
-          Q = semi
-        ),
-        second = list(
-          # birth of trait 1
-          node = n1,
-          age = b1$age,
-          trait = 1,
-          Q = Q
-        )
-      )
-    }
-
-    st <- as.integer(active_status(t, ev$first$node, ev$second$node))
-
-    l <- full_sinba_conditionals(
-      xt$parent, xt$nodes, st, xt$branch,
-      cond,
-      ev$first$age, ev$second$age,
-      root_Q, ev$first$Q, ev$second$Q
     )
-    likes <- c(likes, l[t$root_id, r] + root_prior[r])
+  } else {
+    # second trait is the oldest one
+    sc <- scenario(root, 2)
+    semi <- build_semi_active_Q(model, sc, Q)
+    semi <- normalize_Q(semi)
+    ev <- list(
+      first = list(
+        # birth of trait 2
+        node = n2,
+        age = b2$age,
+        trait = 2,
+        Q = semi
+      ),
+      second = list(
+        # birth of trait 1
+        node = n1,
+        age = b1$age,
+        trait = 1,
+        Q = Q
+      )
+    )
   }
-  mx <- max(likes)
-  if (root_method == "FitzJohn") {
-    l <- exp(likes - mx)
-    d <- sum(l)
-    lk <- 0
-    for (i in seq_len(length(l))) {
-      lk <- lk + l[i] * l[i] / d
-    }
-    return(log(lk) + ev_prob + mx)
-  }
-  lk <- log(sum(exp(likes - mx))) + ev_prob + mx
-  return(lk)
+
+  st <- as.integer(active_status(t, ev$first$node, ev$second$node))
+
+  l <- full_sinba_conditionals(
+    xt$parent, xt$nodes, st, xt$branch,
+    cond,
+    ev$first$age, ev$second$age,
+    root_Q, ev$first$Q, ev$second$Q
+  )
+  return(l[t$root_id, root])
 }

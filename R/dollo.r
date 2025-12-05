@@ -1,16 +1,25 @@
-# youngest_birth_node return the youngest node
-# for the birth of each state.
-youngest_birth_node <- function(t, enc, traits) {
+# youngest_birth_event returns the youngest node
+# for the birth of a given root state.
+youngest_birth_event <- function(t, enc, root) {
   youngest <- list()
 
-  # a single trait
-  if (traits == 1) {
-    youngest[[1]] <- birth_node_states(t, enc)
+  # single trait
+  if (root == "0" || root == "1") {
+    state <- "1"
+    if (root == "1") {
+      state <- "0"
+    }
+    youngest[[1]] <- birth_node_states(t, enc, state)
     return(youngest)
   }
 
   # two traits
   for (i in c(1:2)) {
+    root_state <- substr(root, i, i)
+    state <- "1"
+    if (root_state == "1") {
+      state <- "0"
+    }
     et <- list()
     for (j in seq_len(length(t$tip))) {
       tp <- t$tip[j]
@@ -19,98 +28,21 @@ youngest_birth_node <- function(t, enc, traits) {
         state = substr(enc[[tp]]$state, i, i)
       )
     }
-    youngest[[i]] <- birth_node_states(t, et)
+    youngest[[i]] <- birth_node_states(t, et, state)
   }
-
   return(youngest)
 }
 
-birth_node_states <- function(t, enc) {
-  nodes <- c()
-  for (i in c("0", "1")) {
-    ns <- rep(FALSE, length(t$parent))
-    for (j in seq_len(length(t$tip))) {
-      obs <- enc[[t$tip[j]]]$state
-      if (obs == i || obs == "p") {
-        ns[j] <- TRUE
-      }
+birth_node_states <- function(t, enc, state) {
+  ns <- rep(FALSE, length(t$parent))
+  for (j in seq_len(length(t$tip))) {
+    obs <- enc[[t$tip[j]]]$state
+    if (obs == state || obs == "p") {
+      ns[j] <- TRUE
     }
-    nodes <- c(nodes, dollo(t, ns))
   }
-  return(nodes)
+  return(dollo(t, ns))
 }
-
-# youngest_birth_event returns the youngest node
-# for the birth of each state.
-youngest_birth_event <- function(t, cond) {
-  youngest <- list()
-
-  # a single trait
-  if (ncol(cond) == 2) {
-    nodes <- c()
-    for (i in seq_len(ncol(cond))) {
-      ns <- rep(FALSE, nrow(cond))
-      for (n in seq_len(length(t$tip))) {
-        # set tips
-        if (cond[n, i] == 0) {
-          ns[n] <- TRUE
-        }
-      }
-      nodes <- c(nodes, dollo(t, ns))
-    }
-    youngest[[1]] <- nodes
-    return(youngest)
-  }
-
-  # two traits
-  # trait 1
-  nodes <- c()
-  # state 0
-  ns <- rep(FALSE, nrow(cond))
-  for (n in seq_len(length(t$tip))) {
-    # set tips
-    if (cond[n, 1] == 0 || cond[n, 2] == 0) {
-      ns[n] <- TRUE
-    }
-  }
-  nodes <- c(nodes, dollo(t, ns))
-  # state 1
-  ns <- rep(FALSE, nrow(cond))
-  for (n in seq_len(length(t$tip))) {
-    # set tips
-    if (cond[n, 3] == 0 || cond[n, 4] == 0) {
-      ns[n] <- TRUE
-    }
-  }
-  nodes <- c(nodes, dollo(t, ns))
-  youngest[[1]] <- nodes
-
-  # trait 2
-  nodes <- c()
-  # state 0
-  ns <- rep(FALSE, nrow(cond))
-  for (n in seq_len(length(t$tip))) {
-    # set tips
-    if (cond[n, 1] == 0 || cond[n, 3] == 0) {
-      ns[n] <- TRUE
-    }
-  }
-  nodes <- c(nodes, dollo(t, ns))
-  # state 1
-  ns <- rep(FALSE, nrow(cond))
-  for (n in seq_len(length(t$tip))) {
-    # set tips
-    if (cond[n, 2] == 0 || cond[n, 4] == 0) {
-      ns[n] <- TRUE
-    }
-  }
-  nodes <- c(nodes, dollo(t, ns))
-  youngest[[2]] <- nodes
-
-  return(youngest)
-}
-
-
 
 # dollo detects the youngest node
 # in which an state can be born.

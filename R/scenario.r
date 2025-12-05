@@ -39,49 +39,42 @@ scenario <- function(r, tr) {
 }
 
 # birth_events returns the possible birth events
-# for the given trait birth nodes.
+# for the given birth nodes.
+# This is for the case in which both nodes
+# are not in the same path.
 birth_events <- function(t, youngest) {
+  ev <- list()
   y1 <- youngest[[1]]
   y2 <- youngest[[2]]
-  ev <- list()
-  for (yn1 in y1) {
-    if (yn1 == t$root_id) {
-      next
-    }
-    for (yn2 in y2) {
-      if (yn2 == t$root_id) {
-        next
-      }
-      if (yn1 != yn2) {
-        if (!is_parent(t, yn1, yn2) && !is_parent(t, yn2, yn1)) {
-          next
-        }
-      }
-      ev[[length(ev) + 1]] <- c(yn1, yn2)
-    }
+
+  # the nodes are equal
+  if (y1 == y2) {
+    ev[[1]] <- c(y1, y2)
+    return(ev)
   }
-  if (length(ev) == 0) {
-    # at least one of the traits start at the root
-    if (any(y1 != t$root_id)) {
-      for (yn1 in y1) {
-        if (yn1 == t$root_id) {
-          next
-        }
-        ev[[length(ev) + 1]] <- c(yn1, t$root_id)
-      }
-    } else if (any(y2 != t$root_id)) {
-      for (yn2 in y2) {
-        if (yn2 == t$root_id) {
-          next
-        }
-        ev[[length(ev) + 1]] <- c(t$root_id, yn2)
-      }
-    }
-    if (length(ev) == 0) {
-      # both traits start at the root
-      ev[[length(ev) + 1]] <- c(t$root_id, t$root_id)
-    }
+
+  # the nodes are on the same path towards the root
+  if (is_parent(t, y1, y2) || is_parent(t, y2, y1)) {
+    ev[[1]] <- c(y1, y2)
+    return(ev)
   }
+
+  # the MRCA of both nodes
+  p1 <- path_to_node(t, y1)
+  p2 <- path_to_node(t, y2)
+  x <- t$root_id
+  for (i in seq_len(length(p1))) {
+    if (i > length(p2)) {
+      break
+    }
+    if (p1[i] != p2[i]) {
+      break
+    }
+    x <- p1[i]
+  }
+  ev[[1]] <- c(x, y2)
+  ev[[2]] <- c(y1, x)
+
   return(ev)
 }
 
