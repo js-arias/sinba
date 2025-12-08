@@ -42,6 +42,6 @@ fit_pagel <- function(
     )
     births[[i]] <- b
   }
-  obj <- fit_fixed_births(tree, data, births, model, root, root_method, opts)
+  obj <- fit_fixed_births(tree, data, births, model, opts = opts)
   return(obj)
 }

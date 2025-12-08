@@ -78,6 +78,15 @@ birth_events <- function(t, youngest) {
   return(ev)
 }
 
+# is_valid_birth returns true is a birth event
+# is compatible.
+is_valid_birth <- function(t, ev, yn) {
+  if (ev == yn) {
+    return(TRUE)
+  }
+  return(is_parent(t, ev, yn))
+}
+
 # set_root_prior sets the priors of the root
 # taking into account the birth events.
 set_root_prior <- function(t, model, root, births, youngest) {
