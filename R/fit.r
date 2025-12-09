@@ -455,12 +455,10 @@ fit_fixed_births <- function(
     )
     if (rr$objective < res[[1]]$objective) {
       rr$root <- r
-      rr$ev_nodes <- e
       res <- list()
       res[[1]] <- rr
     } else if (rr$objective == res[[1]]$objective) {
       rr$root <- r
-      rr$ev_nodes <- e
       res[[length(res) + 1]] <- rr
     }
   }
@@ -725,18 +723,13 @@ fit_fixed_matrix <- function(
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
-#' @param root Root prior probabilities.
-#'   By default,
-#'   all states will have the same probability.
-#' @param root_method Method for root calculation at the root.
-#'   By default it use the root prior.
-#'   If set as "FitzJohn" it will use the FitzJohn et al. (2009)
-#'   method,
-#'   in which ancestral states are weighted by its own likelihood.
+#' @param ev_prob set the probability of a birth event.
+#'   By default is 1
+#'   (i.e., we have observed different states in the traits).
 fixed_sinba <- function(
     tree, data, rate_mat, births,
     model = NULL,
-    root = NULL, root_method = "prior") {
+    ev_prob = 1) {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -761,16 +754,9 @@ fixed_sinba <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  if (is.null(root)) {
-    root <- rep(1, ncol(cond))
-  }
-  if (length(root) != ncol(cond)) {
-    stop("fixed_sinba: invalid size for `root` vector.")
-  }
-  root <- root / sum(root)
-  if (root_method == "FitzJohn") {
-    root <- rep(1, ncol(cond))
-  }
+  root <- c("00", "01", "10", "11")
+
+  ev_prob <- 2 * log(ev_prob)
 
   if (is.null(births)) {
     stop("fixed_sinba: undefined `births` events")
@@ -805,170 +791,101 @@ fixed_sinba <- function(
     if (!is_parent(t, b1$node, b2$node) && !(is_parent(t, b2$node, b1$node))) {
       obj <- list(
         logLik = -Inf,
+        k = 0,
         model = model,
         Q = normalize_Q(rate_mat),
         births = births,
-        states = c("00", "01", "10", "11"),
-        root_prior = root,
-        root_method = root_method,
+        root = "NA",
         data = data,
         tree = tree
       )
-      class(obj) <- "fixed_sinba"
+      class(obj) <- "fit_sinba"
       return(obj)
     }
   }
 
-  youngest <- youngest_birth_node(t, et, 2)
+  res <- list()
+  res[[1]] <- list(objective = Inf)
+  for (r in sample(seq_len(length(root)))) {
+    youngest <- youngest_birth_event(t, et, root[r])
+    if (!is_valid_birth(t, births[[1]]$node, youngest[[1]])) {
+      next
+    }
+    if (!is_valid_birth(t, births[[2]]$node, youngest[[2]])) {
+      next
+    }
+    xt <- tree_to_cpp(t)
+    lk <- -sinba_like(
+      t, rate_mat, model, births, xt, cond,
+      r, ev_prob
+    )
+    if (lk < res[[1]]$objective) {
+      rr <- list(
+        objective = lk,
+        root = r
+      )
+      res <- list()
+      res[[1]] <- rr
+    } else if (lk == res[[1]]$objective) {
+      rr <- list(
+        objective = lk,
+        root = r
+      )
+      res[[length(res) + 1]] <- rr
+    }
+  }
 
-  # check for valid events
-  root_prob <- set_root_prior(t, model, root, births, youngest)
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
-  if (all(root_prob == 0)) {
+  if (is.infinite(res[[1]]$objective)) {
     obj <- list(
       logLik = -Inf,
+      k = 0,
       model = model,
       Q = normalize_Q(rate_mat),
       births = births,
-      states = c("00", "01", "10", "11"),
-      root_prior = root,
-      root_method = root_method,
+      root = "NA",
       data = data,
       tree = tree
     )
-    class(obj) <- "fixed_sinba"
+    class(obj) <- "fit_sinba"
     return(obj)
   }
 
-  ev_prob <- 2 * log(prob_birth(t))
+  to_ret <- list()
+  for (i in seq_len(length(res))) {
+    rr <- res[[i]]
+    q <- normalize_Q(rate_mat)
+    root_state <- root[rr$root]
 
-  xt <- tree_to_cpp(t)
-  lk <- sinba_like(
-    t, rate_mat, model, births, xt, cond,
-    log(root_prob), root_method, ev_prob
-  )
-
-  # retrieve the scenarios
-  root_states <- update_root(t, rep(1, 4), births, youngest)
-  root_names <- c("00", "01", "10", "11")
-  age1 <- phylo_node_age(tree, births[[1]]$node)
-  age2 <- phylo_node_age(tree, births[[1]]$node)
-  if (births[[1]]$node == births[[2]]$node) {
-    age1 <- b1$age
-    age2 <- b2$age
-  }
-
-  sc <- c()
-  for (i in seq_len(length(root_states))) {
-    if (root_states[i] == 0) {
-      next
+    # retrieve the scenario
+    age1 <- phylo_node_age(tree, births[[1]]$node)
+    age2 <- phylo_node_age(tree, births[[1]]$node)
+    if (births[[1]]$node == births[[2]]$node) {
+      age1 <- b1$age
+      age2 <- b2$age
     }
-    has_prior <- FALSE
-    for (j in seq_len(length(root))) {
-      obs <- model$observed[[model$states[j]]]
-      if (obs != root_names[i]) {
-        next
-      }
-      if (root[j] != 0) {
-        has_prior <- TRUE
-      }
-    }
-    if (!has_prior) {
-      next
-    }
-    v <- scenario(root_states[i], 1)
+    sc <- scenario(rr$root, 1)
     if (age2 < age1) {
       # second trait is the oldest one
-      v <- scenario(root_states[i], 2)
+      sc <- scenario(rr$root, 2)
     }
-    sc <- c(sc, v)
+
+    obj <- list(
+      logLik = -rr$objective,
+      k = 0,
+      model = model,
+      Q = q,
+      births = births,
+      root = root_state,
+      scenario = sc,
+      data = data,
+      tree = tree
+    )
+    class(obj) <- "fit_sinba"
+    to_ret[[length(to_ret) + 1]] <- obj
   }
-
-  obj <- list(
-    logLik = lk,
-    model = model,
-    Q = normalize_Q(rate_mat),
-    births = births,
-    states = c("00", "01", "10", "11"),
-    root_prior = root,
-    root_method = root_method,
-    scenarios = sc,
-    data = data,
-    tree = tree
-  )
-  class(obj) <- "fixed_sinba"
-  return(obj)
-}
-
-#' @export
-#' @title Basic Print For a "fixed_sinba" Object
-#'
-#' @description
-#' This method implements the `print` method
-#' on a `fixed_sinba` object.
-#'
-#' @param x An object of type "fixed_sinba".
-#' @param digits The number of digits for decimal output.
-#' @param ... Additional arguments are unused.
-print.fixed_sinba <- function(x, digits = 6, ...) {
-  cat("Sinba: Fixed Rate Matrix\n")
-
-  states <- x$model$states
-
-  cat(paste("Log-Likelihood = ", round(x$logLik, digits), "\n", sep = ""))
-  cat("Birth events:\n")
-  n <- colnames(x$data)
-  b1 <- x$births[[1]]
-  cat(paste("- Trait ", n[2], " Node ",
-    b1$node, " time ", round(b1$age, digits), "\n",
-    sep = ""
-  ))
-  b2 <- x$births[[2]]
-  cat(paste("- Trait ", n[3], " Node ",
-    b2$node, " time ", round(b2$age, digits), "\n",
-    sep = ""
-  ))
-  cat("Rates:\n")
-  Q <- x$Q
-  rownames(Q) <- states
-  colnames(Q) <- states
-  print(Q)
-  age1 <- phylo_node_age(x$tree, b1$node)
-  age2 <- phylo_node_age(x$tree, b2$node)
-  if (b1$node == b2$node) {
-    age1 <- b1$age
-    age2 <- b2$age
-  }
-  if ((age1 != age2) && (length(x$scenarios) > 0)) {
-    cat("Semi-active process:\n")
-    for (i in seq_len(length(x$scenarios))) {
-      sc <- x$scenarios[i]
-      sQ <- build_semi_active_Q(x$model, sc, x$Q)
-      if (sc == "12") {
-        cat("second trait active: 00 <-> 01\n")
-      } else if (sc == "13") {
-        cat("first trait active: 00 <-> 10\n")
-      } else if (sc == "24") {
-        cat("first trait active: 01 <-> 11\n")
-      } else if (sc == "34") {
-        cat("second trait active: 10 <-> 11\n")
-      }
-      rownames(sQ) <- states
-      colnames(sQ) <- states
-      sQ <- reduce_matrix(sQ)
-      print(normalize_Q(sQ))
-    }
-  }
-
-  if (x$root_method == "FitzJohn") {
-    cat("Root method: FitzJohn\n")
-  } else {
-    cat("Root prior:\n")
-    root <- x$root_prior
-    names(root) <- states
-    print(root)
-  }
+  return(to_ret)
 }
 
 # sinba_like calculates the likelihood
