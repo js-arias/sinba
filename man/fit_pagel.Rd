@@ -4,14 +4,7 @@
 \alias{fit_pagel}
 \title{Maximum Likelihood Estimation of the Pagel's Model Under the Sinba Model}
 \usage{
-fit_pagel(
-  tree,
-  data,
-  model = NULL,
-  root = NULL,
-  root_method = "prior",
-  opts = NULL
-)
+fit_pagel(tree, data, model = NULL, opts = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -27,16 +20,6 @@ Any other column will be ignored.}
 or \code{new_rates_model()}.
 By default it uses the independent model.}
 
-\item{root}{Root prior probabilities.
-By default,
-all states will have the same probability.}
-
-\item{root_method}{Method for root calculation at the root.
-By default it use the root prior.
-If set as "FitzJohn" it will use the FitzJohn et al. (2009)
-method,
-in which ancestral states are weighted by its own likelihood.}
-
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
@@ -45,6 +28,4 @@ By default it attempts a reasonable set of options.}
 \code{fit_pagel()} searches for the maximum likelihood estimate
 of a given model for two traits
 using the Pagel (1994) model.
-It is a wrapper of \code{fit_fixed_births()}
-with the births at the root.
 }
