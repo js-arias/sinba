@@ -149,7 +149,8 @@ mk_like <- function(t, Q, xt, cond) {
   l <- full_conditionals(
     xt$parent, xt$nodes, xt$branch, cond, Q
   )
-  fitz <- exp(l[t$root_id, ] - max(l[t$root_id, ]))
-  like <- log(sum(fitz)) + max(l[t$root_id, ])
+  scaled <- exp(l[t$root_id, ] - max(l[t$root_id, ]))
+  fitz <- scaled / sum(scaled)
+  like <- log(sum(fitz * scaled)) + max(l[t$root_id, ])
   return(like)
 }

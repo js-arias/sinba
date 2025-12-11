@@ -961,5 +961,18 @@ sinba_like <- function(
     ev$first$age, ev$second$age,
     root_Q, ev$first$Q, ev$second$Q
   )
-  return(l[t$root_id, root])
+
+  # takes into account the hidden states
+  root_states <- c("00", "01", "10", "11")
+  likes <- c()
+  for (i in seq_len(ncol(l))) {
+    obs <- model$observed[[model$states[i]]]
+    if (obs == root_states[root]) {
+      likes <- c(likes, l[t$root_id, i])
+    }
+  }
+  scaled <- exp(likes - max(likes))
+  fitz <- scaled / sum(scaled)
+  like <- log(sum(fitz * scaled)) + max(likes)
+  return(like)
 }
