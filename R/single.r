@@ -349,33 +349,6 @@ fixed_sinba_single <- function(
   return(to_ret)
 }
 
-#' @export
-#' @title Basic Print For a "fixed_sinba_single" Object
-#'
-#' @description
-#' This method implements the `print` method
-#' on a `fixed_sinba_single` object.
-#'
-#' @param x An object of type "fixed_sinba_single".
-#' @param digits The number of digits for decimal output.
-#' @param ... Additional arguments are unused.
-print.fixed_sinba_single <- function(x, digits = 6, ...) {
-  cat("Single Sinba: Fixed Rate Matrix\n")
-  cat(paste("Log-Likelihood = ", round(x$logLik, digits), "\n", sep = ""))
-  cat("Birth event:\n")
-  b <- x$birth
-  cat(paste("- Node ", b$node, " time ", round(b$age, digits), "\n", sep = ""))
-  cat("Rates:\n")
-  Q <- x$Q
-  rownames(Q) <- c(0, 1)
-  colnames(Q) <- c(0, 1)
-  print(Q)
-  cat("Root prior:\n")
-  root <- x$root_prior
-  names(root) <- c(0, 1)
-  print(root)
-}
-
 # sinba_single calculates the likelihood of a single trait
 # under the sinba model.
 sinba_single_like <- function(
