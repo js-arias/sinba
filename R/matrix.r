@@ -40,9 +40,11 @@ new_model <- function(model = "", traits = 2) {
     m <- matrix(0, nrow = 2, ncol = 2)
     m[1, 2] <- 1
     m[2, 1] <- 2
+    cm <- matrix(0, nrow = 2, ncol = 2)
     obj <- list(
       name = "single trait",
       model = m,
+      changes = cm,
       traits = 1,
       states = states,
       observed = observed
@@ -61,9 +63,19 @@ new_model <- function(model = "", traits = 2) {
   observed[[states[3]]] <- "10"
   observed[[states[4]]] <- "11"
   m <- model_matrix(model)
+  cm <- matrix(0, nrow = 4, ncol = 4)
+  cm[1, 2] <- 2
+  cm[1, 3] <- 1
+  cm[2, 1] <- 2
+  cm[2, 4] <- 1
+  cm[3, 1] <- 1
+  cm[3, 4] <- 2
+  cm[4, 2] <- 1
+  cm[4, 3] <- 2
   obj <- list(
     name = model,
     model = m,
+    changes = cm,
     traits = 2,
     states = states,
     observed = observed
@@ -313,6 +325,11 @@ new_hidden_model <- function(states, traits = 2) {
   colnames(m) <- states
   p <- 1
 
+  # trait change matrix
+  cm <- matrix(0, nrow = length(states), ncol = length(states))
+  rownames(cm) <- states
+  colnames(cm) <- states
+
   # x trait
   for (i in seq_len(length(x_states))) {
     for (j in seq_len(length(x_states))) {
@@ -323,6 +340,7 @@ new_hidden_model <- function(states, traits = 2) {
         from <- sprintf("%s,%s", x_states[i], y_states[k])
         to <- sprintf("%s,%s", x_states[j], y_states[k])
         m[from, to] <- p
+        cm[from, to] <- 1
       }
       p <- p + 1
     }
@@ -338,6 +356,7 @@ new_hidden_model <- function(states, traits = 2) {
         from <- sprintf("%s,%s", x_states[k], y_states[i])
         to <- sprintf("%s,%s", x_states[k], y_states[j])
         m[from, to] <- p
+        cm[from, to] <- 2
       }
       p <- p + 1
     }
@@ -346,9 +365,12 @@ new_hidden_model <- function(states, traits = 2) {
   rownames(m) <- NULL
   colnames(m) <- NULL
   m <- format_model_matrix(m)
+  rownames(cm) <- NULL
+  colnames(cm) <- NULL
   obj <- list(
     name = "hidden",
     model = m,
+    changes = cm,
     traits = 2,
     states = states,
     observed = observed
@@ -422,6 +444,7 @@ single_hidden_model <- function(states) {
   # build the matrix
   m <- matrix(0, nrow = length(x_states), ncol = length(x_states))
   p <- 1
+  cm <- matrix(0, nrow = length(x_states), ncol = length(x_states))
 
   for (i in seq_len(length(x_states))) {
     for (j in seq_len(length(x_states))) {
@@ -430,6 +453,7 @@ single_hidden_model <- function(states) {
       }
       m[i, j] <- p
       p <- p + 1
+      cm[i, j] <- 0
     }
   }
 
@@ -437,6 +461,7 @@ single_hidden_model <- function(states) {
   obj <- list(
     name = "single hidden",
     model = m,
+    changes = cm,
     traits = 1,
     states = x_states,
     observed = observed
@@ -785,12 +810,14 @@ normalize_Q <- function(Q) {
 # and the Q matrix,
 build_semi_active_Q <- function(model, sc, Q) {
   sm <- matrix(0, nrow = 4, ncol = 4)
+  active <- 1
   if (sc == "12") {
     # second trait active: 00 <-> 01
     sm[1, 1] <- 1
     sm[1, 2] <- 1
     sm[2, 1] <- 1
     sm[2, 2] <- 1
+    active <- 2
   }
   if (sc == "13") {
     # first trait active: 00 <-> 10
@@ -812,11 +839,13 @@ build_semi_active_Q <- function(model, sc, Q) {
     sm[3, 4] <- 1
     sm[4, 3] <- 1
     sm[4, 4] <- 1
+    active <- 2
   }
   rownames(sm) <- c("00", "01", "10", "11")
   colnames(sm) <- c("00", "01", "10", "11")
 
   m <- model$model
+  cm <- model$changes
   semi <- matrix(0, nrow = nrow(m), ncol = ncol(m))
   for (i in seq_len(nrow(m))) {
     from <- model$observed[[model$states[i]]]
@@ -825,6 +854,10 @@ build_semi_active_Q <- function(model, sc, Q) {
         next
       }
       if (m[i, j] == 0) {
+        next
+      }
+      if (cm[i, j] != active) {
+        # skip changes in the inactive trait
         next
       }
       to <- model$observed[[model$states[j]]]
