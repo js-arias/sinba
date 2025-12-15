@@ -54,7 +54,7 @@ fit_sinba <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  root <- c("00", "01", "10", "11")
+  root_states <- c("00", "01", "10", "11")
 
   ev_prob <- 2 * log(ev_prob)
 
@@ -116,10 +116,9 @@ fit_sinba <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
-  res <- list()
-  res[[1]] <- list(objective = Inf)
-  for (r in sample(seq_len(length(root)))) {
-    youngest <- youngest_birth_event(t, et, root[r])
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    youngest <- youngest_birth_event(t, et, root_states[r])
     # check all possible birth events
     ev <- birth_events(t, youngest)
     for (i in sample(seq_len(length(ev)))) {
@@ -141,68 +140,58 @@ fit_sinba <- function(
         eval_f = fn,
         opts = opts
       )
-      if (rr$objective < res[[1]]$objective) {
+      if (rr$objective < res$objective) {
         rr$root <- r
         rr$ev_nodes <- e
-        res <- list()
-        res[[1]] <- rr
-      } else if (rr$objective == res[[1]]$objective) {
-        rr$root <- r
-        rr$ev_nodes <- e
-        res[[length(res) + 1]] <- rr
+        res <- rr
       }
     }
   }
 
-  to_ret <- list()
-  for (i in seq_len(length(res))) {
-    rr <- res[[i]]
-    q <- from_model_to_Q(mQ, rr$solution[transition_start:length(rr$solution)])
-    q <- normalize_Q(q)
-    births <- list()
-    for (i in 1:2) {
-      j <- i
-      if (single_birth) {
-        j <- 1
-      }
-      n <- get_node_by_len(t, rr$solution[j], rr$ev_node[j])
-      if (n <= 0) {
-        return(Inf)
-      }
-      b <- list(
-        node = n,
-        age = t$br_len[n] + rr$solution[j] - t$age[n]
-      )
-      births[[i]] <- b
+  q <- from_model_to_Q(mQ, res$solution[transition_start:length(res$solution)])
+  q <- normalize_Q(q)
+  births <- list()
+  for (i in 1:2) {
+    j <- i
+    if (single_birth) {
+      j <- 1
     }
-    root_state <- root[rr$root]
-
-    # retrieve the scenario
-    sc <- NULL
-    if (!single_birth) {
-      v <- scenario(rr$root, 1)
-      if (rr$solution[2] < rr$solution[1]) {
-        # second trait is the oldest one
-        v <- scenario(rr$root, 2)
-      }
-      sc <- v
+    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
+    if (n <= 0) {
+      return(Inf)
     }
-
-    obj <- list(
-      logLik = -rr$objective,
-      k = k,
-      model = model,
-      Q = q,
-      births = births,
-      root = root_state,
-      scenario = sc,
-      data = data,
-      tree = tree
+    b <- list(
+      node = n,
+      age = t$br_len[n] + res$solution[j] - t$age[n]
     )
-    class(obj) <- "fit_sinba"
-    to_ret[[length(to_ret) + 1]] <- obj
+    births[[i]] <- b
   }
-  return(to_ret)
+  root_state <- root_states[res$root]
+
+  # retrieve the scenario
+  sc <- NULL
+  if (!single_birth) {
+    v <- scenario(res$root, 1)
+    if (res$solution[2] < res$solution[1]) {
+      # second trait is the oldest one
+      v <- scenario(res$root, 2)
+    }
+    sc <- v
+  }
+
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    root = root_state,
+    scenario = sc,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
 }
 
 #' @export
@@ -352,7 +341,7 @@ fit_fixed_births <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  root <- c("00", "01", "10", "11")
+  root_states <- c("00", "01", "10", "11")
 
   ev_prob <- 2 * log(ev_prob)
 
@@ -436,10 +425,9 @@ fit_fixed_births <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
-  res <- list()
-  res[[1]] <- list(objective = Inf)
-  for (r in sample(seq_len(length(root)))) {
-    youngest <- youngest_birth_event(t, et, root[r])
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    youngest <- youngest_birth_event(t, et, root_states[r])
     if (!is_valid_birth(t, births[[1]]$node, youngest[[1]])) {
       next
     }
@@ -453,19 +441,15 @@ fit_fixed_births <- function(
       eval_f = fn,
       opts = opts
     )
-    if (rr$objective < res[[1]]$objective) {
+    if (rr$objective < res$objective) {
       rr$root <- r
-      res <- list()
-      res[[1]] <- rr
-    } else if (rr$objective == res[[1]]$objective) {
-      rr$root <- r
-      res[[length(res) + 1]] <- rr
+      res <- rr
     }
   }
 
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
-  if (is.infinite(res[[1]]$objective)) {
+  if (is.infinite(res$objective)) {
     obj <- list(
       logLik = -Inf,
       k = k,
@@ -480,41 +464,36 @@ fit_fixed_births <- function(
     return(obj)
   }
 
-  to_ret <- list()
-  for (i in seq_len(length(res))) {
-    rr <- res[[i]]
-    q <- from_model_to_Q(mQ, rr$solution)
-    q <- normalize_Q(q)
-    root_state <- root[rr$root]
+  q <- from_model_to_Q(mQ, res$solution)
+  q <- normalize_Q(q)
+  root_state <- root_states[res$root]
 
-    # retrieve the scenario
-    age1 <- phylo_node_age(tree, births[[1]]$node)
-    age2 <- phylo_node_age(tree, births[[1]]$node)
-    if (births[[1]]$node == births[[2]]$node) {
-      age1 <- b1$age
-      age2 <- b2$age
-    }
-    sc <- scenario(rr$root, 1)
-    if (age2 < age1) {
-      # second trait is the oldest one
-      sc <- scenario(rr$root, 2)
-    }
-
-    obj <- list(
-      logLik = -rr$objective,
-      k = k,
-      model = model,
-      Q = q,
-      births = births,
-      root = root_state,
-      scenario = sc,
-      data = data,
-      tree = tree
-    )
-    class(obj) <- "fit_sinba"
-    to_ret[[length(to_ret) + 1]] <- obj
+  # retrieve the scenario
+  age1 <- phylo_node_age(tree, births[[1]]$node)
+  age2 <- phylo_node_age(tree, births[[1]]$node)
+  if (births[[1]]$node == births[[2]]$node) {
+    age1 <- b1$age
+    age2 <- b2$age
   }
-  return(to_ret)
+  sc <- scenario(res$root, 1)
+  if (age2 < age1) {
+    # second trait is the oldest one
+    sc <- scenario(res$root, 2)
+  }
+
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    root = root_state,
+    scenario = sc,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
 }
 
 #' @export
@@ -577,7 +556,7 @@ fit_fixed_matrix <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  root <- c("00", "01", "10", "11")
+  root_states <- c("00", "01", "10", "11")
 
   ev_prob <- 2 * log(ev_prob)
 
@@ -623,10 +602,9 @@ fit_fixed_matrix <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
-  res <- list()
-  res[[1]] <- list(objective = Inf)
-  for (r in sample(seq_len(length(root)))) {
-    youngest <- youngest_birth_event(t, et, root[r])
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    youngest <- youngest_birth_event(t, et, root_states[r])
     # check all possible birth events
     ev <- birth_events(t, youngest)
     for (i in sample(seq_len(length(ev)))) {
@@ -641,60 +619,50 @@ fit_fixed_matrix <- function(
         eval_f = fn,
         opts = opts
       )
-      if (rr$objective < res[[1]]$objective) {
+      if (rr$objective < res$objective) {
         rr$root <- r
         rr$ev_nodes <- e
-        res <- list()
-        res[[1]] <- rr
-      } else if (rr$objective == res[[1]]$objective) {
-        rr$root <- r
-        rr$ev_nodes <- e
-        res[[length(res) + 1]] <- rr
+        res <- rr
       }
     }
   }
 
-  to_ret <- list()
-  for (i in seq_len(length(res))) {
-    rr <- res[[i]]
-    q <- normalize_Q(rate_mat)
-    births <- list()
-    for (i in 1:2) {
-      j <- i
-      n <- get_node_by_len(t, rr$solution[j], rr$ev_node[j])
-      if (n <= 0) {
-        return(Inf)
-      }
-      b <- list(
-        node = n,
-        age = t$br_len[n] + rr$solution[j] - t$age[n]
-      )
-      births[[i]] <- b
+  q <- normalize_Q(rate_mat)
+  births <- list()
+  for (i in 1:2) {
+    j <- i
+    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
+    if (n <= 0) {
+      return(Inf)
     }
-    root_state <- root[rr$root]
-
-    # retrieve the scenarios
-    sc <- scenario(rr$root, 1)
-    if (rr$solution[2] < rr$solution[1]) {
-      # second trait is the oldest one
-      sc <- scenario(rr$root, 2)
-    }
-
-    obj <- list(
-      logLik = -rr$objective,
-      k = k,
-      model = model,
-      Q = q,
-      births = births,
-      root = root_state,
-      scenario = sc,
-      data = data,
-      tree = tree
+    b <- list(
+      node = n,
+      age = t$br_len[n] + res$solution[j] - t$age[n]
     )
-    class(obj) <- "fit_sinba"
-    to_ret[[length(to_ret) + 1]] <- obj
+    births[[i]] <- b
   }
-  return(to_ret)
+  root_state <- root_states[res$root]
+
+  # retrieve the scenarios
+  sc <- scenario(res$root, 1)
+  if (res$solution[2] < res$solution[1]) {
+    # second trait is the oldest one
+    sc <- scenario(res$root, 2)
+  }
+
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    root = root_state,
+    scenario = sc,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
 }
 
 #' @export
@@ -754,7 +722,7 @@ fixed_sinba <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  root <- c("00", "01", "10", "11")
+  root_states <- c("00", "01", "10", "11")
 
   ev_prob <- 2 * log(ev_prob)
 
@@ -804,10 +772,9 @@ fixed_sinba <- function(
     }
   }
 
-  res <- list()
-  res[[1]] <- list(objective = Inf)
-  for (r in sample(seq_len(length(root)))) {
-    youngest <- youngest_birth_event(t, et, root[r])
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    youngest <- youngest_birth_event(t, et, root_states[r])
     if (!is_valid_birth(t, births[[1]]$node, youngest[[1]])) {
       next
     }
@@ -819,25 +786,17 @@ fixed_sinba <- function(
       t, rate_mat, model, births, xt, cond,
       r, ev_prob
     )
-    if (lk < res[[1]]$objective) {
-      rr <- list(
+    if (lk < res$objective) {
+      res <- list(
         objective = lk,
         root = r
       )
-      res <- list()
-      res[[1]] <- rr
-    } else if (lk == res[[1]]$objective) {
-      rr <- list(
-        objective = lk,
-        root = r
-      )
-      res[[length(res) + 1]] <- rr
     }
   }
 
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
-  if (is.infinite(res[[1]]$objective)) {
+  if (is.infinite(res$objective)) {
     obj <- list(
       logLik = -Inf,
       k = 0,
@@ -852,40 +811,35 @@ fixed_sinba <- function(
     return(obj)
   }
 
-  to_ret <- list()
-  for (i in seq_len(length(res))) {
-    rr <- res[[i]]
-    q <- normalize_Q(rate_mat)
-    root_state <- root[rr$root]
+  q <- normalize_Q(rate_mat)
+  root_state <- root_states[res$root]
 
-    # retrieve the scenario
-    age1 <- phylo_node_age(tree, births[[1]]$node)
-    age2 <- phylo_node_age(tree, births[[1]]$node)
-    if (births[[1]]$node == births[[2]]$node) {
-      age1 <- b1$age
-      age2 <- b2$age
-    }
-    sc <- scenario(rr$root, 1)
-    if (age2 < age1) {
-      # second trait is the oldest one
-      sc <- scenario(rr$root, 2)
-    }
-
-    obj <- list(
-      logLik = -rr$objective,
-      k = 0,
-      model = model,
-      Q = q,
-      births = births,
-      root = root_state,
-      scenario = sc,
-      data = data,
-      tree = tree
-    )
-    class(obj) <- "fit_sinba"
-    to_ret[[length(to_ret) + 1]] <- obj
+  # retrieve the scenario
+  age1 <- phylo_node_age(tree, births[[1]]$node)
+  age2 <- phylo_node_age(tree, births[[1]]$node)
+  if (births[[1]]$node == births[[2]]$node) {
+    age1 <- b1$age
+    age2 <- b2$age
   }
-  return(to_ret)
+  sc <- scenario(res$root, 1)
+  if (age2 < age1) {
+    # second trait is the oldest one
+    sc <- scenario(res$root, 2)
+  }
+
+  obj <- list(
+    logLik = -res$objective,
+    k = 0,
+    model = model,
+    Q = q,
+    births = births,
+    root = root_state,
+    scenario = sc,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
 }
 
 # sinba_like calculates the likelihood

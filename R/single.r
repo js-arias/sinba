@@ -97,8 +97,7 @@ fit_sinba_single <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
-  res <- list()
-  res[[1]] <- list(objective = Inf)
+  res <- list(objective = Inf)
   for (r in sample(seq_len(length(root)))) {
     youngest <- youngest_birth_event(t, et, root[r])
     yn <- youngest[[1]]
@@ -109,43 +108,33 @@ fit_sinba_single <- function(
       eval_f = fn,
       opts = opts
     )
-    if (rr$objective < res[[1]]$objective) {
+    if (rr$objective < res$objective) {
       rr$root <- r
       rr$yn <- yn
-      res <- list()
-      res[[1]] <- rr
-    } else if (rr$objective == res[[1]]$objective) {
-      rr$root <- r
-      rr$yn <- yn
-      res[[length(res) + 1]] <- rr
+      res <- rr
     }
   }
 
-  to_ret <- list()
-  for (i in seq_len(length(res))) {
-    rr <- res[[i]]
-    q <- from_model_to_Q(mQ, rr$solution[2:length(rr$solution)])
-    q <- normalize_Q(q)
-    n <- get_node_by_len(t, rr$solution[1], rr$yn)
-    birth <- list(
-      node = n,
-      age = t$br_len[n] + rr$solution[1] - t$age[n]
-    )
-    root_state <- root[rr$root]
-    obj <- list(
-      logLik = -rr$objective,
-      k = k,
-      model = model,
-      Q = q,
-      birth = birth,
-      root = root_state,
-      data = data,
-      tree = tree
-    )
-    class(obj) <- "fit_sinba_single"
-    to_ret[[length(to_ret) + 1]] <- obj
-  }
-  return(to_ret)
+  q <- from_model_to_Q(mQ, res$solution[2:length(res$solution)])
+  q <- normalize_Q(q)
+  n <- get_node_by_len(t, res$solution[1], res$yn)
+  birth <- list(
+    node = n,
+    age = t$br_len[n] + res$solution[1] - t$age[n]
+  )
+  root_state <- root[res$root]
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    birth = birth,
+    root = root_state,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba_single"
+  return(obj)
 }
 
 #' @export
@@ -283,8 +272,7 @@ fixed_sinba_single <- function(
     stop("fixed_sinba_singe: invalid value for field `age` of `birth`")
   }
 
-  res <- list()
-  res[[1]] <- list(objective = Inf)
+  res <- list(objective = Inf)
   for (r in sample(seq_len(length(root)))) {
     youngest <- youngest_birth_event(t, et, root[r])
     yn <- youngest[[1]]
@@ -296,25 +284,17 @@ fixed_sinba_single <- function(
       t, rate_mat, model, birth, xt, cond,
       r, ev_prob
     )
-    if (lk < res[[1]]$objective) {
-      rr <- list(
+    if (lk < res$objective) {
+      res <- list(
         objective = lk,
         root = r
       )
-      res <- list()
-      res[[1]] <- rr
-    } else if (lk == res[[1]]$objective) {
-      rr <- list(
-        objective = lk,
-        root = r
-      )
-      res[[length(res) + 1]] <- rr
     }
   }
 
   # if no birth sequence is compatible with the birth event
   # the likelihood is 0
-  if (is.infinite(res[[1]]$objective)) {
+  if (is.infinite(res$objective)) {
     obj <- list(
       logLik = -Inf,
       k = 0,
@@ -329,24 +309,19 @@ fixed_sinba_single <- function(
     return(obj)
   }
 
-  to_ret <- list()
-  for (i in seq_len(length(res))) {
-    rr <- res[[i]]
-    root_state <- root[rr$root]
-    obj <- list(
-      logLik = rr$objective,
-      k = 0,
-      model = model,
-      Q = normalize_Q(rate_mat),
-      birth = birth,
-      root = root_state,
-      data = data,
-      tree = tree
-    )
-    class(obj) <- "fit_sinba_single"
-    to_ret[[length(to_ret) + 1]] <- obj
-  }
-  return(to_ret)
+  root_state <- root[res$root]
+  obj <- list(
+    logLik = res$objective,
+    k = 0,
+    model = model,
+    Q = normalize_Q(rate_mat),
+    birth = birth,
+    root = root_state,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba_single"
+  return(obj)
 }
 
 # sinba_single calculates the likelihood of a single trait
