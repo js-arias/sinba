@@ -516,6 +516,18 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
   }
   states <- rep(0, 4 * length(rates))
   base <- model_matrix(model)
+
+  # base matrix for trait changes
+  bcm <- matrix(0, nrow = 4, ncol = 4)
+  bcm[1, 2] <- 2
+  bcm[1, 3] <- 1
+  bcm[2, 1] <- 2
+  bcm[2, 4] <- 1
+  bcm[3, 1] <- 1
+  bcm[3, 4] <- 2
+  bcm[4, 2] <- 1
+  bcm[4, 3] <- 2
+
   if (traits != 2) {
     states <- rep(0, 2 * length(rates))
     base <- matrix(0, nrow = 2, ncol = 2)
@@ -524,9 +536,13 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
     if (model == "ER") {
       base[2, 1] <- 1
     }
+    bcm <- matrix(0, nrow = 2, ncol = 2)
+    bcm[1, 2] <- 1
+    bcm[2, 1] <- 1
     traits <- 1
   }
   m <- matrix(0, nrow = length(states), ncol = length(states))
+  cm <- matrix(0, nrow = length(states), ncol = length(states))
 
   # state transitions
   for (i in seq_len(length(rates))) {
@@ -539,6 +555,7 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
           v <- v + mx
         }
         m[j + offset, k + offset] <- v
+        cm[j + offset, k + offset] <- bcm[j, k]
       }
     }
   }
@@ -579,6 +596,7 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
   obj <- list(
     name = "hidden rates",
     model = m,
+    changes = cm,
     traits = traits,
     states = states,
     observed = observed
