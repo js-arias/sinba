@@ -17,15 +17,19 @@
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   The model must be defined for a single trait.
-#' @param ev_prob set the probability of a birth event.
+#' @param ev_prob Det the probability of a birth event.
 #'   By default is 1
 #'   (i.e., we have observed different states in the traits).
+#' @param root Set the root state.
+#'   By default,
+#'   the root state will be optimized as a parameter.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_sinba_single <- function(
     tree, data, model = NULL,
     ev_prob = 1,
+    root = "",
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba_single: `tree` must be an object of class \"phylo\".")
@@ -49,7 +53,12 @@ fit_sinba_single <- function(
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
 
-  root <- c("0", "1")
+  root_states <- c("0", "1")
+  if (root != "") {
+    if (!(root %in% root_states)) {
+      stop("fit_sinba_single: invalid root state.")
+    }
+  }
 
   ev_prob <- log(ev_prob)
 
@@ -98,8 +107,14 @@ fit_sinba_single <- function(
   }
 
   res <- list(objective = Inf)
-  for (r in sample(seq_len(length(root)))) {
-    youngest <- youngest_birth_event(t, et, root[r])
+  for (r in sample(seq_len(length(root_states)))) {
+    if (root != "") {
+      if (root != root_states[r]) {
+        next
+      }
+    }
+
+    youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     fn <- like_func(yn, r)
     par <- c(runif(1, max = t$age[yn]), runif(max(mQ)))
@@ -122,7 +137,14 @@ fit_sinba_single <- function(
     node = n,
     age = t$br_len[n] + res$solution[1] - t$age[n]
   )
-  root_state <- root[res$root]
+  root_state <- root_states[res$root]
+
+  # if we have to calculate the root,
+  # we add a parameter.
+  if (root == "") {
+    k <- k + 1
+  }
+
   obj <- list(
     logLik = -res$objective,
     k = k,
@@ -217,13 +239,17 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
 #'   in which the event happens.
 #' @param model A model build with `new_model()`
 #'   or `new_hidden_model()`.
-#' @param ev_prob set the probability of a birth event.
+#' @param ev_prob Set the probability of a birth event.
 #'   By default is 1
 #'   (i.e., we have observed different states in the traits).
+#' @param root Set the root state.
+#'   By default,
+#'   the root state will be optimized as a parameter.
 fixed_sinba_single <- function(
     tree, data, rate_mat, birth,
     model = NULL,
-    ev_prob = 1) {
+    ev_prob = 1,
+    root = "") {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba_single: `tree` must be an object of class \"phylo\".")
   }
@@ -255,7 +281,12 @@ fixed_sinba_single <- function(
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
 
-  root <- c("0", "1")
+  root_states <- c("0", "1")
+  if (root != "") {
+    if (!(root %in% root_states)) {
+      stop("fixed_sinba_single: invalid root state.")
+    }
+  }
 
   ev_prob <- log(ev_prob)
 
@@ -273,8 +304,14 @@ fixed_sinba_single <- function(
   }
 
   res <- list(objective = Inf)
-  for (r in sample(seq_len(length(root)))) {
-    youngest <- youngest_birth_event(t, et, root[r])
+  for (r in sample(seq_len(length(root_states)))) {
+    if (root != "") {
+      if (root != root_states[r]) {
+        next
+      }
+    }
+
+    youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     if (!is_valid_birth(t, birth$node, yn)) {
       next
@@ -309,10 +346,17 @@ fixed_sinba_single <- function(
     return(obj)
   }
 
-  root_state <- root[res$root]
+  root_state <- root_states[res$root]
+  k <- 0
+  # if we have to calculate the root,
+  # we add a parameter.
+  if (root == "") {
+    k <- 1
+  }
+
   obj <- list(
     logLik = res$objective,
-    k = 0,
+    k = k,
     model = model,
     Q = normalize_Q(rate_mat),
     birth = birth,

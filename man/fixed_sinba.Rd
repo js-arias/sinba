@@ -4,7 +4,7 @@
 \alias{fixed_sinba}
 \title{Estimate the Likelihood for a Given Sinba Transition Matrices in Two Traits}
 \usage{
-fixed_sinba(tree, data, rate_mat, births, model = NULL, ev_prob = 1)
+fixed_sinba(tree, data, rate_mat, births, model = NULL, ev_prob = 1, root = "")
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -28,9 +28,13 @@ in which the event happens.}
 or \code{new_rates_model()}.
 By default it uses the independent model.}
 
-\item{ev_prob}{set the probability of a birth event.
+\item{ev_prob}{Set the probability of a birth event.
 By default is 1
 (i.e., we have observed different states in the traits).}
+
+\item{root}{Set the root state.
+By default,
+the root state will be optimized as a parameter.}
 }
 \description{
 \code{fixed_sinba()} calculates the likelihood

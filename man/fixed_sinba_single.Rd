@@ -4,7 +4,15 @@
 \alias{fixed_sinba_single}
 \title{Estimate the Likelihood for a Given Sinba Transition Matrix in a Single Trait}
 \usage{
-fixed_sinba_single(tree, data, rate_mat, birth, model = NULL, ev_prob = 1)
+fixed_sinba_single(
+  tree,
+  data,
+  rate_mat,
+  birth,
+  model = NULL,
+  ev_prob = 1,
+  root = ""
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -25,9 +33,13 @@ in which the event happens.}
 \item{model}{A model build with \code{new_model()}
 or \code{new_hidden_model()}.}
 
-\item{ev_prob}{set the probability of a birth event.
+\item{ev_prob}{Set the probability of a birth event.
 By default is 1
 (i.e., we have observed different states in the traits).}
+
+\item{root}{Set the root state.
+By default,
+the root state will be optimized as a parameter.}
 }
 \description{
 \code{fixed_sinba_single()} calculates the likelihood

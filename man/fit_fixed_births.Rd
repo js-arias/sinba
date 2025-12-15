@@ -4,7 +4,15 @@
 \alias{fit_fixed_births}
 \title{Maximum Likelihood Estimation of a Transition Matrix With Fixed Births}
 \usage{
-fit_fixed_births(tree, data, births, model = NULL, ev_prob = 1, opts = NULL)
+fit_fixed_births(
+  tree,
+  data,
+  births,
+  model = NULL,
+  ev_prob = 1,
+  root = "",
+  opts = NULL
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -26,9 +34,13 @@ in which the event happens.}
 or \code{new_rates_model()}.
 By default it uses the independent model.}
 
-\item{ev_prob}{set the probability of a birth event.
+\item{ev_prob}{Set the probability of a birth event.
 By default is 1
 (i.e., we have observed different states in the traits).}
+
+\item{root}{Set the root state.
+By default,
+the root state will be optimized as a parameter.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.

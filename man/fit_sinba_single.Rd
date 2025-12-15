@@ -4,7 +4,7 @@
 \alias{fit_sinba_single}
 \title{Maximum Likelihood Estimation of the Sinba Model in a Single Trait}
 \usage{
-fit_sinba_single(tree, data, model = NULL, ev_prob = 1, opts = NULL)
+fit_sinba_single(tree, data, model = NULL, ev_prob = 1, root = "", opts = NULL)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -20,9 +20,13 @@ Any other column will be ignored.}
 or \code{new_rates_model()}.
 The model must be defined for a single trait.}
 
-\item{ev_prob}{set the probability of a birth event.
+\item{ev_prob}{Det the probability of a birth event.
 By default is 1
 (i.e., we have observed different states in the traits).}
+
+\item{root}{Set the root state.
+By default,
+the root state will be optimized as a parameter.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.

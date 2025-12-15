@@ -10,6 +10,7 @@ fit_sinba(
   model = NULL,
   single_birth = FALSE,
   ev_prob = 1,
+  root = "",
   opts = NULL
 )
 }
@@ -31,9 +32,13 @@ By default it uses the independent model.}
 it will set the birth of both traits in the same location
 (reducing one parameter).}
 
-\item{ev_prob}{set the probability of a birth event.
+\item{ev_prob}{Set the probability of a birth event.
 By default is 1
 (i.e., we have observed different states in the traits).}
+
+\item{root}{Set the root state.
+By default,
+the root state will be optimized as a parameter.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
