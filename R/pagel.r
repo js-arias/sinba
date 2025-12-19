@@ -17,14 +17,23 @@
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
+#' @param root_method Method for root calculation at the root.
+#'   By default it use "fitzjohn"
+#'   (FitzJohn et al., 2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
+#'   If set as "prior" it will use a root prior.
+#' @param root Root prior probabilities.
+#'   By default,
+#'   all states will have the same probability.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_pagel <- function(
     tree, data, model = NULL,
+    root_method = "fitzjohn", root = NULL,
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
-    stop("fit_sinba: `tree` must be an object of class \"phylo\".")
+    stop("fit_pagel: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
@@ -32,13 +41,23 @@ fit_pagel <- function(
     model <- new_model("IND")
   }
   if (!inherits(model, "sinba_model")) {
-    stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
+    stop("fit_pagel: `model` must be an object of class \"sinba_model\".")
   }
   mQ <- model$model
   k <- max(mQ)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
+
+  if (root_method == "prior") {
+    if (is.null(root)) {
+      root <- rep(1, ncol(cond))
+    }
+    if (length(root) != ncol(cond)) {
+      stop("fit_pagel: invalid size for `root` vector.")
+    }
+    root <- root / sum(root)
+  }
 
   # closure for the likelihood function
   like_func <- function() {
@@ -53,7 +72,7 @@ fit_pagel <- function(
       }
 
       Q <- from_model_to_Q(mQ, p)
-      lk <- mk_like(t, Q, xt, cond)
+      lk <- mk_like(t, Q, xt, cond, root)
       return(-lk)
     })
   }
@@ -83,6 +102,7 @@ fit_pagel <- function(
   obj <- list(
     logLik = -rr$objective,
     k = k,
+    root = root,
     model = model,
     Q = q,
     data = data,
@@ -142,14 +162,28 @@ print.fit_mk <- function(x, digits = 6, ...) {
   rownames(Q) <- states
   colnames(Q) <- states
   print(Q)
+
+  if (is.null(x$root)) {
+    cat("Root method: fitzjohn\n")
+  } else {
+    cat("Root method: prior\n")
+    cat("Root prior:\n")
+    root <- x$root
+    names(root) <- states
+    print(root)
+  }
 }
 
-mk_like <- function(t, Q, xt, cond) {
+mk_like <- function(t, Q, xt, cond, root) {
   Q <- normalize_Q(Q)
   l <- full_conditionals(
     xt$parent, xt$nodes, xt$branch, cond, Q
   )
   scaled <- exp(l[t$root_id, ] - max(l[t$root_id, ]))
+  if (!is.null(root)) {
+    like <- log(sum(root * scaled)) + max(l[t$root_id, ])
+    return(like)
+  }
   fitz <- scaled / sum(scaled)
   like <- log(sum(fitz * scaled)) + max(l[t$root_id, ])
   return(like)
