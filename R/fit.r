@@ -1007,6 +1007,6 @@ def_nloptr_opts <- function(k) {
   return(list(
     "algorithm" = "NLOPT_LN_SBPLX",
     xtol_abs = rep(v, k),
-    maxeval = 1000000
+    maxeval = 100000
   ))
 }
