@@ -114,12 +114,7 @@ fit_sinba <- function(
   }
 
   if (is.null(opts)) {
-    v <- 1e-06
-    opts <- list(
-      "algorithm" = "NLOPT_LN_SBPLX",
-      xtol_abs = rep(v, k),
-      maxeval = 10000
-    )
+    opts <- def_nloptr_opts(k)
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
@@ -444,12 +439,7 @@ fit_fixed_births <- function(
   }
 
   if (is.null(opts)) {
-    v <- 1e-06
-    opts <- list(
-      "algorithm" = "NLOPT_LN_SBPLX",
-      xtol_abs = rep(v, k),
-      maxeval = 10000
-    )
+    opts <- def_nloptr_opts(k)
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
@@ -642,12 +632,7 @@ fit_fixed_matrix <- function(
   }
 
   if (is.null(opts)) {
-    v <- 1e-06
-    opts <- list(
-      "algorithm" = "NLOPT_LN_SBPLX",
-      xtol_abs = rep(v, k),
-      maxeval = 10000
-    )
+    opts <- def_nloptr_opts(k)
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
@@ -1014,4 +999,14 @@ sinba_like <- function(
   fitz <- scaled / sum(scaled)
   like <- log(sum(fitz * scaled)) + max(likes)
   return(like)
+}
+
+# provide a default nloptr options
+def_nloptr_opts <- function(k) {
+  v <- 1e-6
+  return(list(
+    "algorithm" = "NLOPT_LN_SBPLX",
+    xtol_abs = rep(v, k),
+    maxeval = 1000000
+  ))
 }

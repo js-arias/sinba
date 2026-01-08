@@ -78,12 +78,7 @@ fit_pagel <- function(
   }
 
   if (is.null(opts)) {
-    v <- 1e-06
-    opts <- list(
-      "algorithm" = "NLOPT_LN_SBPLX",
-      xtol_abs = rep(v, k),
-      maxeval = 10000
-    )
+    opts <- def_nloptr_opts(k)
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
