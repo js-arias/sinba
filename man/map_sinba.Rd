@@ -4,7 +4,14 @@
 \alias{map_sinba}
 \title{Stochastic Map For the Sinba Model}
 \usage{
-map_sinba(fitted, n = 100)
+map_sinba(
+  fitted = NULL,
+  n = 100,
+  tree = NULL,
+  data = NULL,
+  model = NULL,
+  opts = NULL
+)
 }
 \arguments{
 \item{fitted}{An object of the type 'fit_sinba'
@@ -12,8 +19,30 @@ map_sinba(fitted, n = 100)
 
 \item{n}{Number of stochastic maps.
 Default is 100.}
+
+\item{tree}{A phylogenetic tree of class "phylo".}
+
+\item{data}{A data frame with the data.
+The first column should contain the taxon names,
+The second and third column contains the data,
+coded as 0 and 1.
+Any other column will be ignored.}
+
+\item{model}{A model build with \code{new_model()},
+\code{new_hidden_model()},
+or \code{new_rates_model()}.
+By default it uses the independent model.}
+
+\item{opts}{User defined parameters for the optimization
+with the \code{nloptr} package.
+By default it attempts a reasonable set of options.}
 }
 \description{
-\code{map_sinba()} uses a reconstruction using the Sinba model
-to build one or more stochastic mappings.
+\code{map_sinba()} build one or more stochastic mappings
+using a reconstruction from the Sinba model
+or by reading a tree,
+a data set,
+and a model,
+and fitting the model on the tree
+for each stochastic map.
 }

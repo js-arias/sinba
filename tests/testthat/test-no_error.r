@@ -266,3 +266,18 @@ test_that("map_sinba works", {
 
   expect_no_error(map_sinba(fz, n = 2))
 })
+
+test_that("map_sinba from raw data works", {
+  skip_on_cran()
+  set.seed(6)
+
+  tree <- pbtree(n = 26, tip.label = LETTERS)
+  x <- c(0, 0, rep(1, 12), rep(0, 12))
+  z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
+  data_xz <- data.frame(LETTERS, x, z)
+
+  expect_no_error(map_sinba(
+    tree = tree, data = data_xz,
+    model = new_model("IND"), n = 2
+  ))
+})

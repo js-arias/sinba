@@ -5,14 +5,52 @@
 #' Stochastic Map For the Sinba Model
 #'
 #' @description
-#' `map_sinba()` uses a reconstruction using the Sinba model
-#' to build one or more stochastic mappings.
+#' `map_sinba()` build one or more stochastic mappings
+#' using a reconstruction from the Sinba model
+#' or by reading a tree,
+#' a data set,
+#' and a model,
+#' and fitting the model on the tree
+#' for each stochastic map.
 #'
 #' @param fitted An object of the type 'fit_sinba'
 #'   (i.e., a reconstruction using the Sinba model).
 #' @param n Number of stochastic maps.
 #'   Default is 100.
-map_sinba <- function(fitted, n = 100) {
+#' @param tree A phylogenetic tree of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
+#'   By default it uses the independent model.
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+map_sinba <- function(
+    fitted = NULL, n = 100,
+    tree = NULL, data = NULL, model = NULL, opts = NULL) {
+  if (!is.null(fitted)) {
+    return(map_sinba_fitted(fitted, n))
+  }
+  if (is.null(tree) || is.null(data)) {
+    stop("map_sinba: undefined data")
+  }
+
+  maps <- list()
+  for (i in seq_len(n)) {
+    f <- fit_sinba(tree, data, model = model, opts = opts)
+    sm <- map_sinba_fitted(f, n = 1)
+    maps[[i]] <- sm[[1]]
+  }
+  class(maps) <- c("multiSimmap", "multiPhylo")
+  return(maps)
+}
+
+map_sinba_fitted <- function(fitted, n) {
   if (!inherits(fitted, "fit_sinba")) {
     stop("map_sinba: `fitted` must be an object of class \"fit_sinba\".")
   }
