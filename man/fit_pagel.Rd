@@ -4,7 +4,14 @@
 \alias{fit_pagel}
 \title{Maximum Likelihood Estimation of the Pagel's Model Under the Sinba Model}
 \usage{
-fit_pagel(tree, data, model = NULL, opts = NULL)
+fit_pagel(
+  tree,
+  data,
+  model = NULL,
+  root_method = "fitzjohn",
+  root = NULL,
+  opts = NULL
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
@@ -19,6 +26,16 @@ Any other column will be ignored.}
 \code{new_hidden_model()},
 or \code{new_rates_model()}.
 By default it uses the independent model.}
+
+\item{root_method}{Method for root calculation at the root.
+By default it use "fitzjohn"
+(FitzJohn et al., 2009) method,
+in which ancestral states are weighted by its own likelihood.
+If set as "prior" it will use a root prior.}
+
+\item{root}{Root prior probabilities.
+By default,
+all states will have the same probability.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
