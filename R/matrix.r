@@ -707,6 +707,33 @@ model_join <- function(x, y) {
 }
 
 #' @export
+#' @title Transforms a Model into an ARD model
+#'
+#' @description
+#' `model_to_ard()` reads a model
+#' and transforms it into an ARD model.
+#'
+#' @param model A model definition as build with `new_model()`.
+model_to_ard <- function(model) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_to_ard: `model` must be an object of class \"sinba_model\".")
+  }
+
+  p <- 1
+  for (i in seq_len(nrow(model$model))) {
+    for (j in seq_len(ncol(model$model))) {
+      if (model$model[i, j] == 0) {
+        next
+      }
+      model$model[i, j] <- p
+      p <- p + 1
+    }
+  }
+
+  return(model)
+}
+
+#' @export
 #' @title Add a New Parameter to a Model
 #'
 #' @description
