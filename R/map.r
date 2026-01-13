@@ -232,7 +232,7 @@ pick_root_state <- function(model, root, end) {
   end <- end / sum(end)
   # apply FitzJohn prior
   end <- end * end
-  end <- end / sum(end)
+  end <- end / max(end)
 
   while (TRUE) {
     s <- sample(seq_len(length(end)), 1)
