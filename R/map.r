@@ -381,7 +381,33 @@ pick_next_state <- function(Q, s) {
 #'   (i.e., a reconstruction using the Sinba model).
 #' @param n Number of stochastic maps.
 #'   Default is 100.
-map_pagel <- function(fitted, n = 100) {
+#' @param tree A phylogenetic tree of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
+#'   By default it uses the independent model.
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+map_pagel <- function(
+    fitted = NULL, n = 100,
+    tree = NULL, data = NULL, model = NULL, opts = NULL) {
+  if (!is.null(fitted)) {
+    return(map_pagel_fitted(fitted, n))
+  }
+  if (is.null(tree) || is.null(data)) {
+    stop("map_pagel: undefined data")
+  }
+  f <- fit_pagel(tree, data, model = model, opts = opts)
+  return(map_pagel_fitted(f, n))
+}
+
+map_pagel_fitted <- function(fitted, n) {
   if (!inherits(fitted, "fit_mk")) {
     stop("map_pagel: `fitted` must be an object of class \"fit_sinba\".")
   }

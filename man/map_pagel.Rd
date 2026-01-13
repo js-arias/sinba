@@ -4,7 +4,14 @@
 \alias{map_pagel}
 \title{Stochastic Map For the Pagel´s Model}
 \usage{
-map_pagel(fitted, n = 100)
+map_pagel(
+  fitted = NULL,
+  n = 100,
+  tree = NULL,
+  data = NULL,
+  model = NULL,
+  opts = NULL
+)
 }
 \arguments{
 \item{fitted}{An object of the type 'fit_sinba'
@@ -12,6 +19,23 @@ map_pagel(fitted, n = 100)
 
 \item{n}{Number of stochastic maps.
 Default is 100.}
+
+\item{tree}{A phylogenetic tree of class "phylo".}
+
+\item{data}{A data frame with the data.
+The first column should contain the taxon names,
+The second and third column contains the data,
+coded as 0 and 1.
+Any other column will be ignored.}
+
+\item{model}{A model build with \code{new_model()},
+\code{new_hidden_model()},
+or \code{new_rates_model()}.
+By default it uses the independent model.}
+
+\item{opts}{User defined parameters for the optimization
+with the \code{nloptr} package.
+By default it attempts a reasonable set of options.}
 }
 \description{
 \code{map_pagel()} build one or more stochastic mappings
