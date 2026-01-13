@@ -363,3 +363,98 @@ pick_next_state <- function(Q, s) {
     }
   }
 }
+
+#' @export
+#' @title
+#' Stochastic Map For the Pagel´s Model
+#'
+#' @description
+#' `map_pagel()` build one or more stochastic mappings
+#' using a reconstruction from the Pagel's model
+#' or by reading a tree,
+#' a data set,
+#' and a model,
+#' and fitting the model on the tree
+#' for each stochastic map.
+#'
+#' @param fitted An object of the type 'fit_sinba'
+#'   (i.e., a reconstruction using the Sinba model).
+#' @param n Number of stochastic maps.
+#'   Default is 100.
+map_pagel <- function(fitted, n = 100) {
+  if (!inherits(fitted, "fit_mk")) {
+    stop("map_pagel: `fitted` must be an object of class \"fit_sinba\".")
+  }
+
+  t <- phylo_to_sinba(fitted$tree)
+  et <- encode_traits(t, fitted$data, 2)
+  cond <- set_conditionals(t, et, fitted$model)
+  root <- fitted$root
+  Q <- fitted$Q
+  model <- fitted$model
+
+  xt <- tree_to_cpp(t)
+  l <- full_conditionals(
+    xt$parent, xt$nodes, xt$branch, cond, Q
+  )
+
+  s_names <- fitted$model$states
+  edges <- paste(fitted$tree$edge[, 1], ",", fitted$tree$edge[, 2], sep = "")
+
+  maps <- list()
+  for (i in seq_len(n)) {
+    sm <- evolve_map_mk(t, l, Q, model, root)
+    mtree <- fitted$tree
+    mtree$maps <- sm$maps
+    mtree$mapped.edge <- sm$edges
+    rownames(mtree$mapped.edge) <- edges
+    colnames(mtree$mapped.edge) <- s_names
+    class(mtree) <- c("simmap", "phylo")
+    attr(mtree, "map.order") <- "right-to-left"
+    maps[[i]] <- mtree
+  }
+  class(maps) <- c("multiSimmap", "multiPhylo")
+  return(maps)
+}
+
+evolve_map_mk <- function(t, cond, Q, model, root) {
+  root_state <- pick_mk_root(root, cond[t$root, ])
+  states <- rep(0, length(t$parent))
+  states[t$root] <- root_state
+  sm <- list()
+  edges <- matrix(0, nrow = length(t$edge), ncol = ncol(Q))
+  for (e in seq_len(length(t$edge))) {
+    n <- t$edge[e]
+    p <- t$parent[n]
+    s <- states[p]
+    h <- pick_history(Q, t$br_len[n], s, cond[n, ], model$states)
+    states[n] <- h$end
+    sm[[e]] <- h$evs
+    edges[e, ] <- h$cm
+  }
+  return(list(
+    maps = sm,
+    edges = edges
+  ))
+}
+
+pick_mk_root <- function(root, end) {
+  end <- exp(end - max(end))
+  end <- end / sum(end)
+  if (is.null(root)) {
+    # apply FitzJohn prior
+    end <- end * end
+  } else {
+    end <- end * root
+  }
+
+  # scale to the maximum
+  end <- end / max(end)
+
+  while (TRUE) {
+    s <- sample(seq_len(length(end)), 1)
+    if (runif(1) < end[s]) {
+      return(s)
+    }
+  }
+}
