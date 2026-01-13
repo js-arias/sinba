@@ -86,12 +86,18 @@ sim_sinba <- function(
     n2 <- 0
     while (TRUE) {
       n2 <- sample(seq_len(length(t$parent)), size = 1)
+      # skip root
+      if (n2 == t$root_id) {
+        next
+      }
       sz <- node_size(t, n2)
       if (sz > min_size && sz <= max_size) {
         break
       }
     }
     path <- path_to_node(t, n2)
+    # removes the root
+    path <- path[2:length(path)]
     n1 <- path[1]
     if (length(path) > 1) {
       n1 <- sample(path, size = 1)
@@ -108,6 +114,9 @@ sim_sinba <- function(
       stop("sim_sinba: expecting `node` in an element of `births`")
     }
     n <- births[[i]]$node
+    if (n == t$root_id) {
+      stop("sim_sinba: `node` should be different from root")
+    }
     if (is.null(births[[i]]$age)) {
       a <- runif(1, max = t$br_len[n])
       births[[i]]$age <- a
@@ -217,6 +226,10 @@ darwin_scenario <- function(tree, births) {
     n1 <- 0
     while (TRUE) {
       n1 <- sample(seq_len(length(t$parent)), size = 1)
+      # skip root
+      if (n1 == t$root_id) {
+        next
+      }
       sz <- node_size(t, n1)
       if (sz > min_size && sz <= max_size) {
         break
@@ -255,6 +268,10 @@ unreplicated_burst_scenario <- function(tree, births) {
     n1 <- 0
     while (TRUE) {
       n1 <- sample(seq_len(length(t$parent)), size = 1)
+      # skip root
+      if (n1 == t$root_id) {
+        next
+      }
       sz <- node_size(t, n1)
       if (sz > min_size && sz <= max_size) {
         break
