@@ -606,6 +606,107 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
 }
 
 #' @export
+#' @title Join Two Models into a Single Model
+#'
+#' @description
+#' `model_join()` takes to models of a single trait
+#' and merged it as a single Pagel-like model.
+#'
+#' @param x The model that represents the first trait.
+#' @param y The model that represents the second trait.
+model_join <- function(x, y) {
+  if (!inherits(x, "sinba_model") || !inherits(y, "sinba_model")) {
+    stop("model_join: `x` and `y` must be objects of class \"sinba_model\".")
+  }
+  if ((x$traits != 1) || (y$traits != 1)) {
+    stop("model_join: `x` and `y` must be single trait models.")
+  }
+
+  # rename y states
+  y_observed <- list()
+  for (i in seq_len(length(y$states))) {
+    s <- unlist(strsplit(y$states[i], "x"))
+    sn <- paste("y", s[2], sep = "")
+    y_observed[[sn]] <- y$observed[y$states[i]]
+    y$states[i] <- sn
+  }
+  y$observed <- y_observed
+
+  # combine individual states
+  observed <- list()
+  states <- c()
+  for (i in seq_len(length(x$states))) {
+    for (j in seq_len(length(y$states))) {
+      s <- sprintf("%s,%s", x$states[i], y$states[j])
+      o <- sprintf("%s%s", x$observed[[x$states[i]]], y$observed[[y$states[j]]])
+      observed[[s]] <- o
+      states <- c(states, s)
+    }
+  }
+  states <- sort(states)
+
+  # build the matrix
+  m <- matrix(0, nrow = length(states), ncol = length(states))
+  rownames(m) <- states
+  colnames(m) <- states
+
+  # trait change matrix
+  cm <- matrix(0, nrow = length(states), ncol = length(states))
+  rownames(cm) <- states
+  colnames(cm) <- states
+
+  # x trait
+  for (i in seq_len(length(x$states))) {
+    for (j in seq_len(length(x$states))) {
+      p <- x$model[i, j]
+      if (p == 0) {
+        next
+      }
+      for (k in seq_len(length(y$states))) {
+        from <- sprintf("%s,%s", x$states[i], y$states[k])
+        to <- sprintf("%s,%s", x$states[j], y$states[k])
+        m[from, to] <- p
+        cm[from, to] <- 1
+      }
+    }
+  }
+
+  # y trait
+  x_offset <- max(x$model)
+  for (i in seq_len(length(y$states))) {
+    for (j in seq_len(length(y$states))) {
+      p <- y$model[i, j]
+      if (p == 0) {
+        next
+      }
+      p <- p + x_offset
+      for (k in seq_len(length(x$states))) {
+        from <- sprintf("%s,%s", x$states[k], y$states[i])
+        to <- sprintf("%s,%s", x$states[k], y$states[j])
+        m[from, to] <- p
+        cm[from, to] <- 2
+      }
+    }
+  }
+
+  rownames(m) <- NULL
+  colnames(m) <- NULL
+  m <- format_model_matrix(m)
+  rownames(cm) <- NULL
+  colnames(cm) <- NULL
+  obj <- list(
+    name = "join",
+    model = m,
+    changes = cm,
+    traits = 2,
+    states = states,
+    observed = observed
+  )
+  class(obj) <- "sinba_model"
+  return(obj)
+}
+
+#' @export
 #' @title Add a New Parameter to a Model
 #'
 #' @description
