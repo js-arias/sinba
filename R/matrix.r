@@ -84,6 +84,27 @@ new_model <- function(model = "", traits = 2) {
   return(obj)
 }
 
+#' @export
+#' @title Basic Print For a "sinba_model" Object
+#'
+#' @description
+#' This method implements the `print` method
+#' on a `sinba_model` object.
+#'
+#' @param x An object of type "sinba_model".
+#' @param ... Additional arguments are unused.
+print.sinba_model <- function(x, ...) {
+  cat(sprintf("Model: %s\n", x$name))
+  cat(paste("Traits: ", x$traits, ".\n", sep = ""))
+  states <- x$states
+  mm <- x$model
+  rownames(mm) <- states
+  colnames(mm) <- states
+  cat("Model parameters:\n")
+  print(mm)
+  cat(paste("Free parameters = ", max(mm), ".\n", sep = ""))
+}
+
 # model_matrix returns a design matrix for a given model.
 model_matrix <- function(model = "") {
   if (model == "CORR") {
