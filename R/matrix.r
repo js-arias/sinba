@@ -592,6 +592,7 @@ new_rates_model <- function(model = "", rates = NULL, traits = 2) {
       off_j <- (j - 1) * nrow(base)
       for (k in seq_len(nrow(base))) {
         m[k + off_i, k + off_j] <- rt
+        cm[k + off_i, k + off_j] <- 3
       }
       rt <- rt + 1
     }
@@ -976,6 +977,7 @@ normalize_Q <- function(Q) {
 # the birth scenario,
 # and the Q matrix,
 build_semi_active_Q <- function(model, sc, Q) {
+  states <- NULL
   sm <- matrix(0, nrow = 4, ncol = 4)
   active <- 1
   if (sc == "12") {
@@ -985,6 +987,7 @@ build_semi_active_Q <- function(model, sc, Q) {
     sm[2, 1] <- 1
     sm[2, 2] <- 1
     active <- 2
+    states <- c("00", "01")
   }
   if (sc == "13") {
     # first trait active: 00 <-> 10
@@ -992,6 +995,7 @@ build_semi_active_Q <- function(model, sc, Q) {
     sm[1, 3] <- 1
     sm[3, 1] <- 1
     sm[3, 3] <- 1
+    states <- c("00", "10")
   }
   if (sc == "24") {
     # first trait active: 01 <-> 11
@@ -999,6 +1003,7 @@ build_semi_active_Q <- function(model, sc, Q) {
     sm[2, 4] <- 1
     sm[4, 2] <- 1
     sm[4, 4] <- 1
+    states <- c("01", "11")
   }
   if (sc == "34") {
     # second trait active: 10 <-> 11
@@ -1007,6 +1012,7 @@ build_semi_active_Q <- function(model, sc, Q) {
     sm[4, 3] <- 1
     sm[4, 4] <- 1
     active <- 2
+    states <- c("10", "11")
   }
   rownames(sm) <- c("00", "01", "10", "11")
   colnames(sm) <- c("00", "01", "10", "11")
@@ -1023,6 +1029,22 @@ build_semi_active_Q <- function(model, sc, Q) {
       if (m[i, j] == 0) {
         next
       }
+
+      if (cm[i, j] == 3) {
+        # rate change
+        to <- model$observed[[model$states[j]]]
+        if (from != to) {
+          # skip if states are different
+          next
+        }
+        if ((from != states[1]) && (from != states[2])) {
+          # skip if the rate change is inactive states
+          next
+        }
+        semi[i, j] <- Q[i, j]
+        next
+      }
+
       if (cm[i, j] != active) {
         # skip changes in the inactive trait
         next
