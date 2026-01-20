@@ -1,0 +1,460 @@
+---
+title: "How to make custom models"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{How to make custom models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(sinba)
+```
+
+The main purpose of models defined in Sinba
+is to indicate the parameters of the **Q matrix**
+that are to be estimated.
+In the Sinba package,
+each parameter is identified by a positive number,
+while values in zero indicate a zero transition rate.
+If the numbers are repeated,
+it is assumed that they represent the same parameter.
+
+By default,
+a Pagel's independent model (1994)
+for two traits is used in most functions:
+
+```{r}
+new_model()
+```
+
+To create the correlated Pagel's model (1994),
+set the function parameter `model` as "CORR":
+
+```{r}
+new_model(model = "CORR")
+```
+
+Other "canned" (i.e., predefined) models are:
+
+- "ER":
+  The equal rates model,
+  in which all transformations have the same value
+  (i.e., a single parameter).
+  This is an independent model.
+- "ER2":
+  The model for equal rates in each trait.
+  In this model each trait has a single transition rate,
+  but the rates in each trait are independent.
+  This is an independent model.
+  It has two parameters.
+- "ERs":
+  The equal state rates model.
+  In this model,
+  each state change has its own transition rate.
+  This model is called the "simplified independent model"
+  by Boyko & Beaulieu (2023).
+  It is an independent model.
+  It has two parameters.
+- "sCORR":
+  The simplified correlated model
+  (Boyko & Beaulieu, 2023).
+  In this model each state change depends on the other state.
+  It is a correlated model.
+  It has two parameters.
+- "IND":
+  The Pagel's independent model (1994).
+  It has four parameters.
+  This is the default value for the `model` parameter.
+- "SYM":
+  The symmetric model.
+  In this model each transition is symmetric
+  (i.e., 00→01 = 01→00).
+  It is a correlated model.
+  It has four parameters.
+- "x":
+  A correlated model in which x
+  (the first trait)
+  depends on y
+  (the second trait).
+  It is a correlated model.
+  It has six parameters.
+- "y":
+  A correlated model in which y
+  (the second trait)
+  depends on x
+  (the first trait).
+  It is a correlated model.
+  It has six parameters.
+- "CORR":
+  The Pagel's correlated model (1994),
+  also known as the "all rates different" model.
+  It is a correlated model.
+  It has eight parameters.
+- "CMK":
+  The correlated Mk model of Grundler (2025).
+  This model does not follow Pagel's convention (1994)
+  by allowing the simultaneous change of two traits.
+  It is a correlated model.
+  It has three parameters.
+
+By default,
+the function `new_model()` creates a model with two traits,
+but it can be used to create models with a single trait:
+
+```{r}
+new_model(traits = 1)
+```
+
+# Hidden models
+
+By default,
+Sinba models are standard binary models.
+But it also supports models with hidden states,
+i.e., models in which only two states are observed in each trait,
+but one or more states can be divided into one
+or more
+unobserved states
+(that is,
+'hidden' states).
+There are two forms of viewing hidden states,
+and both are supported in Sinba.
+In one,
+states are divided by hidden rates,
+and in the other,
+the rates might be the same on the tree,
+but some states are divided into hidden states.
+
+## Hidden rates
+
+In a hidden rates model,
+there are two or more rates on the tree
+that change the values of the transitions between states,
+but not the underlying model
+(Felsenstein & Churchill, 1996;
+Beaulieu et al., 2013).
+The hidden rates model is created
+with the function `new_rates_model()`,
+based on a given underlying model,
+and a vector with the labels assigned to each rate:
+
+```{r}
+new_rates_model(model = "IND", rates = c("a", "b"))
+```
+
+As in a simple model,
+it is possible to create a multiple-rates model
+for a single trait:
+
+```{r}
+new_rates_model(rates = c("a", "b", "c"), traits = 1)
+```
+
+## Hidden states
+
+In the hidden states model
+(Marazzi et al., 2012;
+Tarasov, 2019),
+each state might be decomposed into one
+or more hidden states.
+Note that,
+in contrast to the hidden rates model,
+states can have different numbers of hidden states.
+A hidden states model
+is created with the function `new_hidden_model()`.
+You must define a list with the traits 
+and states with hidden states.
+Each element in the list defines a trait
+(either "x" or "y" for the first and second traits,
+respectively),
+a state
+(either 0 or 1),
+and a vector with the labels of the hidden states.
+The created model is always
+an independent model with the highest number of parameters:
+
+```{r}
+new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 1,
+    hidden = c("a", "b", "c")
+  ),
+  list(
+    trait = "y",
+    state = 0,
+    hidden = c("d", "e")
+  )
+))
+```
+
+As in other functions,
+you can define a hidden state model for a single trait,
+using the parameter traits set as 1:
+
+```{r}
+new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 1,
+    hidden = c("a", "b")
+  )
+), traits = 1)
+```
+
+# Joining two models
+
+Sometimes you have two models
+(each of a single trait),
+and you want to join them into a single model.
+You can do this operation with the `model_join()` function:
+
+```{r}
+m1 <- new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 1,
+    hidden = c("a", "b", "c")
+  )
+), traits = 1)
+m2 <- new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 0,
+    hidden = c("d", "e")
+  )
+), traits = 1)
+m1
+m2
+model_join(m1, m2)
+```
+
+# Model edition
+
+While the sinba package provides several predefined models,
+it does not exhaust all model possibilities.
+Nevertheless,
+it has some functionality to edit the models,
+allowing new models to be constructed from the basic models.
+
+## Add a new parameter
+
+By default,
+most models are based on Pagel's convention (1994):
+only a single trait can change at each time step.
+You can add parameters by using the `model_add()` function
+and indicating the row and column of the new parameter to be added.
+
+```{r}
+m <- new_model(model = "ER")
+m
+m <- model_add(m, c(1, 4))
+m <- model_add(m, c(2, 3))
+m <- model_add(m, c(3, 2))
+m <- model_add(m, c(4, 1))
+m
+```
+
+## Equate parameters
+
+It is possible to set one or more parameters to be equivalent,
+so it reduces the number of parameters of the model.
+Use the function `model_equate()` to do this operation,
+indicating the IDs of the parameters to be equated.
+
+```{r}
+m <- new_rates_model(rates = c("a", "b", "c"), traits = 1)
+m
+# set all the transition rates to be the same
+model_equate(m, c(2, 3, 5, 7, 9, 10))
+```
+
+## Drop parameter
+
+To eliminate a parameter,
+use the function `model_drop()`
+with a vector indicating the ID of one
+or more parameters
+to be eliminated.
+The removed parameters will always have the rate of zero.
+
+```{r}
+m <- new_model()
+m
+# differentiate parameters of the "11" trait
+m <- model_add(m, c(4, 2))
+m <- model_add(m, c(4, 3))
+m
+# set the state "11" as an absorbing state
+model_drop(m, c(5, 6))
+```
+
+## Collapse model
+
+The model collapse operation removes any unobserved state
+from the parameter list.
+Note that this operation
+does not reduce the size of the model matrix
+but sets some parameters at zero.
+Use the function `model_collapse()`
+to remove these unseen states;
+this function requires a tree and data.
+
+```{r}
+library(phytools)
+
+tree <- pbtree(n = 26, tip.label = LETTERS)
+x <- c(0, 0, rep(1, 12), rep(0, 12))
+y <- x
+
+data_xy <- data.frame(LETTERS, x, y)
+
+m <- new_model(model = "ER")
+m
+
+# we add simultaneous changes to the model
+m <- model_add(m, c(1, 4))
+m <- model_add(m, c(2, 3))
+m <- model_add(m, c(3, 2))
+m <- model_add(m, c(4, 1))
+
+model_collapse(m, tree, data_xy)
+```
+
+## All rates different
+
+To transform any model to an all-rates-different (ARD) model
+(a correlated model),
+use the function `model_to_ard()`.
+For models with many states,
+this edition will imply an explosion of model parameters.
+
+```{r}
+hrm <- new_rates_model(model = "IND", rates = c("a", "b"))
+hrm
+model_to_ard(hrm)
+```
+
+## A modified two traits precursor model
+
+As an example,
+here we use the various model functions
+to create a modified version of the precursor model
+(Marazzi et al., 2012) for two traits.
+In the precursor model,
+one of the states has two hidden states (say 0);
+one of them is called the *precursor state*,
+as only from this state is it possible to go
+to the other state (say 1).
+Then the Q matrix for the original precursor model is:
+
+$$
+\begin{bmatrix}
+0 & q_{0a\to 0p} & 0 \\
+q_{0p\to 0a} & 0 & q_{0p\to 1} \\
+0 & q_{1\to 0p} & 0 \\
+\end{bmatrix}
+$$
+
+Where *0a* is the absent state
+and *0p* is the precursor state.
+As Marazzi et al. (2012) want the model
+to have the same number of parameters as a two-rate binary model,
+the rates between *0a→0p* and *0p→0a* are equal,
+as well as *0p→1* and *1→0p*.
+
+We want to modify the precursor model so once in the precursor state,
+it will be impossible to return to the absent state,
+and we set all transitions to be different
+(this model will have three parameters):
+
+```{r}
+# creates a model with hidden states for state 0
+pm <- new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 0,
+    hidden = c("a", "p")
+  )
+), traits = 1)
+pm
+# remove changes between 0a and 1
+pm <- model_drop(pm, c(2, 5))
+pm
+
+# if we want to create the classic precursor model
+# we equate the parameters:
+# pm <- model_equate(pm, c(3, 4))
+# pm <- model_equate(pm, c(1, 2))
+
+# removes the transtion 0p->0a
+pm <- model_drop(pm, 2)
+pm
+```
+
+Now we want a precursor model with two traits,
+so we merge two models of one trait
+to create a new one for two traits:
+
+```{r}
+pm2 <- model_join(pm, pm)
+pm2
+```
+
+# Cited literature
+
+Beaulieu, J. M., O'Meara, B. C., & Donoghue, M. J.
+(2013).
+Identifying hidden rate changes in the evolution of a binary morphological character: the evolution of plant habit in campanulid angiosperms.
+*Systematic Biology*,
+**62**, 725-737.
+DOI: [10.1093/sysbio/syt034](https://doi.org/10.1093/sysbio/syt034).
+
+Boyko, J. D., & Beaulieu, J. M.
+(2023).
+Reducing the biases in false correlations between discrete characters.
+*Systematic Biology*,
+**72**, 476-488.
+DOI: [10.1093/sysbio/syac066](https://doi.org/10.1093/sysbio/syac066).
+
+Felsenstein, J., & Churchill, G. A.
+(1996).
+A Hidden Markov Model approach to variation among sites in rate of evolution.
+*Molecular Biology and Evolution*,
+**13**, 93-104.
+DOI: [10.1093/oxfordjournals.molbev.a025575](https://doi.org/10.1093/oxfordjournals.molbev.a025575).
+
+Grundler, M. C.
+(2025).
+Correlated evolution of categorical characters under a simple model.
+*Evolution*,
+**79**, 309-318.
+DOI: [10.1093/evolut/qpae166](https://doi.org/10.1093/evolut/qpae166).
+
+Marazzi, B., Ané, C., Simon, M. F., Delgado-Salinas, A., Luckow, M., & Sanderson, M. J.
+(2012).
+Locating evolutionary precursors on a phylogenetic tree.
+*Evolution*,
+**66**, 3918-3930.
+DOI: [10.1111/j.1558-5646.2012.01720.x](https://doi.org/10.1111/j.1558-5646.2012.01720.x).
+
+Pagel, M.
+(1994).
+Detecting correlated evolution on phylogenies: a general method for the comparative analysis of discrete characters.
+*Proceedings of the Royal Society of London. Series B: Biological Sciences*,
+**255**, 37-45.
+DOI: [10.1098/rspb.1994.0006](https://doi.org/10.1098/rspb.1994.0006).
+
+Tarasov, S.
+(2019).
+Integration of anatomy ontologies and evo-devo using structured Markov models suggests a new framework for modeling discrete phenotypic traits.
+*Systematic Biology*,
+**68**, 698-716.
+DOI: [10.1093/sysbio/syz005](https://doi.org/10.1093/sysbio/syz005).

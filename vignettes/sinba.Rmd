@@ -1,0 +1,249 @@
+---
+title: "Basic use of Sinba model"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Basic use of Sinba model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(sinba)
+```
+
+The package sinba implements the **Sinba** (single birth of a trait) model.
+The Sinba model is used to test the correlation
+between two traits using a phylogenetic comparative method framework
+originally developed by Pagel (1994).
+
+# Pagel's method
+
+When traits are independent,
+each trait can be represented by a **Q matrix**
+that contains the instantaneous transition rates between each state.
+For example,
+in a binary trait the Q matrix is:
+
+$$
+Q=\begin{bmatrix}
+- & q_{0\to 1} \\
+q_{1\to 0} & - \\
+\end{bmatrix}
+$$
+
+Using the pruning algorithm of Felsenstein (1981),
+it is possible to estimate the likelihood of a trait,
+given a phylogenetic tree (with branch lengths)
+and the model Q matrix.
+If you got two *independent* traits,
+then the full likelihood is the multiplication of the likelihood of both traits.
+
+But what happens if both traits are correlated?
+In such a case,
+the transformation between two states in a trait
+is different given the state of the second trait.
+So you can create a Q matrix
+with transformations between both traits.
+Pagel put a constraint in that matrix:
+only a single transformation is allowed at a time instant.
+So the Q matrix for both traits is:
+
+$$
+Q=\begin{bmatrix}
+- & q_{00\to 01} & q_{00\to 10} & 0 & \\
+q_{01\to 00} & - & 0 & q_{01\to 11} & \\
+q_{10\to 00} & 0 & - & q_{10\to 11} & \\
+0 & q_{11\to 01} & q_{11\to 10} & - & \\
+\end{bmatrix}
+$$
+
+The advantage of this formalization
+is that when trait changes are independent
+(i.e., $q_{00\to 01} = q_{10\to 11}$,
+$q_{00\to 10} = q_{01\to 11}$,
+$q_{01\to 00} = q_{11\to 10}$,
+and $q_{10\to 00} = q_{11\to 01}$),
+the resulting likelihood is identical to modeling both traits independently.
+Then we can test for correlation between the two traits
+using the likelihood of the Q matrix
+and the number of free parameters,
+using,
+for example, the Akaike information criterion
+(AIC, Akaike, 1974).
+
+# Darwin's dilemma
+
+While the logic of Pagel's method is straightforward,
+Maddison & FitzJohn (2015)
+found that in some cases,
+in particular,
+when one of the traits has a single origin,
+the results of Pagel's method are misleading.
+They labeled their scenarios as *Darwin's dilemma*
+(a single change in both traits in the same branch)
+and the *unreplicated burst*
+(a single change of a trait,
+and the other trait changes its evolution speed).
+In those cases,
+the Pagel's method prefers trait correlation,
+when an independent model should be preferred.
+
+```{r}
+# An example from the book of Revell & Harmon (2022)
+# section 7.2.2,
+# pp. 173-177.
+library(phytools)
+library(RColorBrewer)
+
+# seed to make the example reproducible
+set.seed(6)
+
+tree <- pbtree(n = 26, tip.label = LETTERS)
+x <- c(0, 0, rep(1, 12), rep(0, 12))
+y <- x
+z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
+
+plotTree.datamatrix(tree,
+  data.frame(
+    x = as.factor(setNames(x, LETTERS)),
+    y = as.factor(setNames(y, LETTERS)),
+    z = as.factor(setNames(z, LETTERS)),
+    row.names = LETTERS
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("YlOrBr", "Greens", "Purples")
+)
+
+# Darwin's dilemma
+data_xy <- data.frame(LETTERS, x, y)
+
+pagel_xy_ind <- fit_pagel(tree, data_xy, model = new_model("IND"))
+pagel_xy_corr <- fit_pagel(tree, data_xy, model = new_model("CORR"))
+aic_xy <- setNames(
+  c(
+    AIC(pagel_xy_ind),
+    AIC(pagel_xy_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR")
+)
+aic_xy
+
+# Unreplicated burst
+data_xz <- data.frame(LETTERS, x, z)
+
+pagel_xz_ind <- fit_pagel(tree, data_xz, model = new_model("IND"))
+pagel_xz_corr <- fit_pagel(tree, data_xz, model = new_model("CORR"))
+
+aic_xz <- setNames(
+  c(
+    AIC(pagel_xz_ind),
+    AIC(pagel_xz_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR")
+)
+aic_xz
+```
+
+# The Sinba model
+
+The main problem with Darwin's dilemma
+and the unreplicated burst scenario
+is the presence of many "00" tips,
+which suggests that whenever *x* is "0",
+*y* should also be "0".
+But this could be explained better
+if it just happened that the birth of state "1"
+in both traits
+just happened at the same branch,
+so the Q matrix cannot model the evolution in basal
+or independent branches
+because there is no process at all.
+In the Sinba model
+(for the *single birth of a trait*),
+a trait starts as *inactive*:
+no transitions happen.
+Then there is the birth of one of the traits,
+so the process is *semi-active*
+(i.e., only one trait can change).
+Finally,
+there is the birth of the second trait,
+so the process is a full process,
+or *active*.
+
+Apart from the parameters of the Q matrix,
+the Sinba model has three additional parameters:
+the location of each birth event
+and the state of the root.
+
+Now we can compare the AIC values
+of the traditional models from Pagel's method
+and the models from Sinba:
+
+```{r}
+# Sinba model with the Darwin scenario
+sinba_xy_ind <- fit_sinba(tree, data_xy, model = new_model("IND"))
+sinba_xy_corr <- fit_sinba(tree, data_xy, model = new_model("CORR"))
+
+aic_xy <- setNames(
+  c(
+    AIC(pagel_xy_ind),
+    AIC(pagel_xy_corr),
+    AIC(sinba_xy_ind),
+    AIC(sinba_xy_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR", "Sinba-IND", "Sinba-CORR")
+)
+aic_xy
+
+# Sinba model with unreplicated burst scenario
+sinba_xz_ind <- fit_sinba(tree, data_xz, model = new_model("IND"))
+sinba_xz_corr <- fit_sinba(tree, data_xz, model = new_model("CORR"))
+
+aic_xz <- setNames(
+  c(
+    AIC(pagel_xz_ind),
+    AIC(pagel_xz_corr),
+    AIC(sinba_xz_ind),
+    AIC(sinba_xz_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR", "Sinba-IND", "Sinba-CORR")
+)
+aic_xz
+```
+
+# Cited literature
+
+Akaike, H.
+(1974).
+A new look at the statistical model identification.
+*IEEE transactions on automatic control*,
+**19**, 716-723.
+DOI: [10.1109/TAC.1974.1100705](https://doi.org/10.1109/TAC.1974.1100705).
+
+Felsenstein, J.
+(1981).
+Evolutionary trees from DNA sequences: a maximum likelihood approach.
+*Journal of molecular evolution*,
+**17**, 368-376.
+DOI: [10.1007/BF01734359](10.1007/BF01734359).
+
+Maddison, W. P., & FitzJohn, R. G.
+(2015).
+The unsolved challenge to phylogenetic correlation tests for categorical characters.
+*Systematic Biology*,
+**64**, 127-136.
+DOI: [10.1093/sysbio/syu070](https://doi.org/10.1093/sysbio/syu070).
+
+Pagel, M.
+(1994).
+Detecting correlated evolution on phylogenies: a general method for the comparative analysis of discrete characters.
+*Proceedings of the Royal Society of London. Series B: Biological Sciences*,
+**255**, 37-45.
+DOI: [10.1098/rspb.1994.0006](https://doi.org/10.1098/rspb.1994.0006).
