@@ -283,11 +283,18 @@ so it reduces the number of parameters of the model.
 Use the function `model_equate()` to do this operation,
 indicating the IDs of the parameters to be equated.
 
+For the particular case of the hidden rates model,
+the function `model_equate_trans_rates()`
+makes all transition rates equal.
+
 ```{r}
 m <- new_rates_model(new_model(traits = 1), rates = c("a", "b", "c"))
 m
 # set all the transition rates to be the same
 model_equate(m, c(2, 3, 5, 7, 9, 10))
+
+# a simple function to make all the rates equal
+model_equate_trans_rates(m)
 ```
 
 ## Drop parameter

@@ -859,6 +859,54 @@ model_equate <- function(model, params) {
 }
 
 #' @export
+#' @title Make Equivalent all Transition Rates
+#'
+#' @description
+#' `model_equate_trans_rates()` read a mode definition
+#' and make all transition rates
+#' (i.e., a model created with `new_rates_model()`)
+#' equal.
+#'
+#' @param model A model definition as build with `new_model()`.
+model_equate_trans_rates <- function(model) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_equate: `model` must be an object of class \"sinba_model\".")
+  }
+
+  is_rates_model <- FALSE
+  for (i in seq_len(nrow(model$changes))) {
+    for (j in seq_len(ncol(model$changes))) {
+      if (model$changes[i, j] == 3) {
+        is_rates_model <- TRUE
+        break
+      }
+    }
+    if (is_rates_model) {
+      break()
+    }
+  }
+  if (!is_rates_model) {
+    return(model)
+  }
+
+  m <- model$model
+  cm <- model$changes
+  p <- max(m) + 1
+  for (i in seq_len(ncol(m))) {
+    for (j in seq_len(nrow(m))) {
+      if (cm[i, j] != 3) {
+        next()
+      }
+      m[i, j] <- p
+    }
+  }
+  m <- format_model_matrix(m)
+  model$name <- "user defined"
+  model$model <- m
+  return(model)
+}
+
+#' @export
 #' @title Remove a Parameter From a Model
 #'
 #' @description
