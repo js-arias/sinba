@@ -103,6 +103,24 @@ print.sinba_model <- function(x, ...) {
   cat("Model parameters:\n")
   print(mm)
   cat(paste("Free parameters = ", max(mm), ".\n", sep = ""))
+
+  sts <- ""
+  for (i in seq_len(length(states))) {
+    if (i == 1) {
+      sts <- states[i]
+      next
+    }
+    sts <- sprintf("%s; %s", sts, states[i])
+  }
+  cat(paste("States: ", sts, "\n", sep = ""))
+
+  obs <- c()
+  for (i in seq_len(length(states))) {
+    obs <- c(obs, x$observed[[states[i]]])
+  }
+  names(obs) <- states
+  cat("Observed:\n")
+  print(obs)
 }
 
 # model_matrix returns a design matrix for a given model.
