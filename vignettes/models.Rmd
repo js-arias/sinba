@@ -126,36 +126,12 @@ unobserved states
 'hidden' states).
 There are two forms of viewing hidden states,
 and both are supported in Sinba.
-In one,
-states are divided by hidden rates,
-and in the other,
-the rates might be the same on the tree,
-but some states are divided into hidden states.
-
-## Hidden rates
-
-In a hidden rates model,
-there are two or more rates on the tree
-that change the values of the transitions between states,
-but not the underlying model
-(Felsenstein & Churchill, 1996;
-Beaulieu et al., 2013).
-The hidden rates model is created
-with the function `new_rates_model()`,
-based on a given underlying model,
-and a vector with the labels assigned to each rate:
-
-```{r}
-new_rates_model(model = "IND", rates = c("a", "b"))
-```
-
-As in a simple model,
-it is possible to create a multiple-rates model
-for a single trait:
-
-```{r}
-new_rates_model(rates = c("a", "b", "c"), traits = 1)
-```
+In the first form,
+one or more states will have each two
+or more hidden states.
+In the second form,
+the state transitions have the same structure,
+but there are two or more hidden rates.
 
 ## Hidden states
 
@@ -207,6 +183,44 @@ new_hidden_model(list(
     hidden = c("a", "b")
   )
 ), traits = 1)
+```
+
+## Hidden rates
+
+In a hidden rates model,
+there are two or more rates on the tree
+that change the values of the transitions between states,
+but not the underlying model
+(Felsenstein & Churchill, 1996;
+Beaulieu et al., 2013).
+The hidden rates model is created
+with the function `new_rates_model()`,
+based on a given underlying model,
+and a vector with the labels assigned to each rate:
+
+```{r}
+new_rates_model(new_model("IND"), rates = c("a", "b"))
+```
+
+The number of traits in the model depends on the underlying base model.
+
+```{r}
+# creates a model with a single trait
+# and three rates
+new_rates_model(new_model(traits = 1), rates = c("a", "b", "c"))
+```
+The underlying model can have hidden states,
+but not hidden rates.
+
+```{r}
+hm <- new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 1,
+    hidden = c("a", "b", "c")
+  )
+))
+new_rates_model(hm, rates = c("p", "q"))
 ```
 
 # Joining two models
@@ -270,7 +284,7 @@ Use the function `model_equate()` to do this operation,
 indicating the IDs of the parameters to be equated.
 
 ```{r}
-m <- new_rates_model(rates = c("a", "b", "c"), traits = 1)
+m <- new_rates_model(new_model(traits = 1), rates = c("a", "b", "c"))
 m
 # set all the transition rates to be the same
 model_equate(m, c(2, 3, 5, 7, 9, 10))
@@ -337,7 +351,7 @@ For models with many states,
 this edition will imply an explosion of model parameters.
 
 ```{r}
-hrm <- new_rates_model(model = "IND", rates = c("a", "b"))
+hrm <- new_rates_model(new_model("IND"), rates = c("a", "b"))
 hrm
 model_to_ard(hrm)
 ```
