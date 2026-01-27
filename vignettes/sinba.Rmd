@@ -232,7 +232,7 @@ Felsenstein, J.
 Evolutionary trees from DNA sequences: a maximum likelihood approach.
 *Journal of molecular evolution*,
 **17**, 368-376.
-DOI: [10.1007/BF01734359](10.1007/BF01734359).
+DOI: [10.1007/BF01734359](https://doi.org/10.1007/BF01734359).
 
 Maddison, W. P., & FitzJohn, R. G.
 (2015).
