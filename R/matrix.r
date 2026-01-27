@@ -725,6 +725,82 @@ model_to_ard <- function(model) {
 }
 
 #' @export
+#' @title Transforms a Model Using a Defined Model
+#'
+#' @description
+#' `model_as()` reads a model and transforms it
+#' into one of the model defined by `new_model()`.
+#' It only works on models without hidden rates.
+#' The function equates all the parameters of the model
+#' with the parameters of the of the definition,
+#' and set all transformations between hidden states
+#' as a single parameter.
+#'
+#' @param model The model to be updated.
+#' @param def The model definition as used in `new_model()`.
+model_as <- function(model, def) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_as: `model` must be an object of class \"sinba_model\".")
+  }
+  if (model$traits != 2) {
+    return(model)
+  }
+
+  is_rates_model <- FALSE
+  for (i in seq_len(nrow(model$changes))) {
+    for (j in seq_len(ncol(model$changes))) {
+      if (model$changes[i, j] == 3) {
+        is_rates_model <- TRUE
+        break
+      }
+    }
+    if (is_rates_model) {
+      break()
+    }
+  }
+  if (is_rates_model) {
+    return(model)
+  }
+
+  t <- model_matrix(def)
+  rownames(t) <- c("00", "01", "10", "11")
+  colnames(t) <- c("00", "01", "10", "11")
+  p <- max(t) + 1
+
+  states <- model$states
+  m <- matrix(0, nrow = length(states), ncol = length(states))
+
+  for (i in seq_len(length(states))) {
+    from <- model$observed[[states[i]]]
+    for (j in seq_len(length(states))) {
+      if (i == j) {
+        # skip diagonals
+        next
+      }
+      if (model$model[i, j] == 0) {
+        # skip zeros
+        next
+      }
+      to <- model$observed[[states[j]]]
+      if (t[from, to] != 0) {
+        # use the definition parameter
+        m[i, j] <- t[from, to]
+      } else {
+        # hidden transition
+        m[i, j] <- p
+      }
+    }
+  }
+
+  rownames(m) <- NULL
+  colnames(m) <- NULL
+  m <- format_model_matrix(m)
+  model$name <- sprintf("hidden + %s", def)
+  model$model <- m
+  return(model)
+}
+
+#' @export
 #' @title Add a New Parameter to a Model
 #'
 #' @description

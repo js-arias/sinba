@@ -363,6 +363,36 @@ hrm
 model_to_ard(hrm)
 ```
 
+## Set to a definition model
+
+As using ARD in hidden states
+can produce an explosion of parameters,
+maybe a simpler solution is to force the model
+to use the same parameters
+as in one of the "canned" model definitions
+as they are used in `new_model()`.
+With the function `model_as()`
+the parameters of the model
+will be set to be the same
+as the parameters of the canned model,
+with an additional parameter
+for changes in the hidden states
+(for example,
+from x0a,y1 to x0b,y1).
+
+```{r}
+m1 <- new_hidden_model(list(
+  list(
+    trait = "x",
+    state = 1,
+    hidden = c("a", "b")
+  )
+), traits = 1)
+m2 <- model_join(m1, new_model(traits = 1))
+m2
+model_as(m2, "CORR")
+```
+
 ## A modified two traits precursor model
 
 As an example,
@@ -427,6 +457,33 @@ to create a new one for two traits:
 ```{r}
 pm2 <- model_join(pm, pm)
 pm2
+```
+Maybe it is a better idea to set the birth of both precursors
+using the same rate:
+
+```{r}
+# set the birth of both precursors as the same parameter
+pm2 <- model_equate(pm2, c(1, 2))
+pm2
+```
+
+If we set the model to have all the rates different,
+the model will have a large amount of parameters
+(18!):
+
+```{r}
+# precursor model with all rates different
+model_to_ard(pm2)
+```
+
+Maybe it will be simpler to use the same rates
+as in the correlated model,
+with a single parameter for the birth of the precursor:
+
+```{r}
+# the precursor model with the same parameters
+# as the Pagel's correlated model:
+model_as(pm2, "CORR")
 ```
 
 # Cited literature
