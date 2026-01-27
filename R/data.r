@@ -33,11 +33,18 @@ retrieve_state <- function(data, tip, trait) {
   }
   states <- c(FALSE, FALSE)
   for (i in seq_len(length(r))) {
-    if (data[r[i], trait] == 0) {
-      states[1] <- TRUE
+    sts <- c(data[r[i], trait])
+    if (is.character(sts)) {
+      # split if it is a polymorphic trait
+      sts <- unlist(strsplit(sts, "[+]"))
     }
-    if (data[r[i], trait] == 1) {
-      states[2] <- TRUE
+    for (s in sts) {
+      if (s == 0) {
+        states[1] <- TRUE
+      }
+      if (s == 1) {
+        states[2] <- TRUE
+      }
     }
   }
   if (all(states)) {
@@ -46,10 +53,7 @@ retrieve_state <- function(data, tip, trait) {
   }
   if (!states[1] && !states[2]) {
     # unknown state is treated as unknown
-    if (length(r) == 0) {
-      # unobserved tip
-      return("?")
-    }
+    return("?")
   }
   if (states[1]) {
     return("0")
