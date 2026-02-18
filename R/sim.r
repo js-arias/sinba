@@ -115,7 +115,7 @@ sim_sinba <- function(
     }
     n <- births[[i]]$node
     if (n == t$root_id) {
-      stop("sim_sinba: `node` should be different from root")
+      next
     }
     if (is.null(births[[i]]$age)) {
       a <- runif(1, max = t$br_len[n])
@@ -125,7 +125,8 @@ sim_sinba <- function(
       stop(sprintf("sim_sinba: expecting `age` value for birth %d", i))
     }
   }
-  if (births[[1]]$node == births[[2]]$node) {
+  if ((births[[1]]$node != t$root_id) &&
+    (births[[1]]$node == births[[2]]$node)) {
     if (births[[1]]$age > births[[2]]$age) {
       a <- births[[2]]$age
       births[[2]]$age <- births[[1]]$age
