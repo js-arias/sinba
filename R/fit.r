@@ -1,5 +1,10 @@
 #' @import nloptr
 
+# Maximum transition rate.
+# This maximum is used as very large transition rates
+# produce matrices that cannot be exponentiated.
+maximum_transition_rate <- 200
+
 #' @export
 #' @title
 #' Maximum Likelihood Estimation of the Sinba Model
@@ -82,7 +87,7 @@ fit_sinba <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p[transition_start:length(p)] > 1000)) {
+      if (any(p[transition_start:length(p)] > maximum_transition_rate)) {
         return(Inf)
       }
 
@@ -425,7 +430,7 @@ fit_fixed_births <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p > 1000)) {
+      if (any(p > maximum_transition_rate)) {
         return(Inf)
       }
 

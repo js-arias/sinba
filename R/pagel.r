@@ -67,7 +67,7 @@ fit_pagel <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p > 1000)) {
+      if (any(p > maximum_transition_rate)) {
         return(Inf)
       }
 
