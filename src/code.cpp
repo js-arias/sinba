@@ -185,7 +185,7 @@ cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
 			}
 
 			// inactive process.
-			from = conditional(to, root_Q, lengths[n]);
+			from = to;
 			break;
 		case 1:
 			if (st[n] == 2)
