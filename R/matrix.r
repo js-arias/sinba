@@ -41,13 +41,19 @@ new_model <- function(model = "", traits = 2) {
     m[1, 2] <- 1
     m[2, 1] <- 2
     cm <- matrix(0, nrow = 2, ncol = 2)
+    cm[1, 2] <- 1
+    cm[2, 1] <- 1
+    trait_states <- list()
+    trait_states[["x"]] <- list(trait = "x", states = states)
     obj <- list(
       name = "single trait",
       model = m,
       changes = cm,
       traits = 1,
+      rates = 1,
       states = states,
-      observed = observed
+      observed = observed,
+      trait_states = trait_states
     )
     class(obj) <- "sinba_model"
     return(obj)
@@ -72,13 +78,18 @@ new_model <- function(model = "", traits = 2) {
   cm[3, 4] <- 2
   cm[4, 2] <- 1
   cm[4, 3] <- 2
+  trait_states <- list()
+  trait_states[["x"]] <- list(trait = "x", states = c("x0", "x1"))
+  trait_states[["y"]] <- list(trait = "y", states = c("y0", "y1"))
   obj <- list(
     name = model,
     model = m,
     changes = cm,
     traits = 2,
+    rates = 1,
     states = states,
-    observed = observed
+    observed = observed,
+    trait_states = trait_states
   )
   class(obj) <- "sinba_model"
   return(obj)
@@ -103,6 +114,7 @@ print.sinba_model <- function(x, ...) {
   cat("Model parameters:\n")
   print(mm)
   cat(paste("Free parameters = ", max(mm), ".\n", sep = ""))
+  cat(paste("Rates: ", x$rates, ".\n", sep = ""))
 
   sts <- ""
   for (i in seq_len(length(states))) {
@@ -333,6 +345,9 @@ new_hidden_model <- function(states, traits = 2) {
   }
   x_states <- sort(x_states)
   y_states <- sort(y_states)
+  trait_states <- list()
+  trait_states[["x"]] <- list(trait = "x", states = x_states)
+  trait_states[["y"]] <- list(trait = "y", states = y_states)
 
   # combine individual states
   observed <- list()
@@ -411,8 +426,10 @@ new_hidden_model <- function(states, traits = 2) {
     model = m,
     changes = cm,
     traits = 2,
+    rates = 1,
     states = states,
-    observed = observed
+    observed = observed,
+    trait_states = trait_states
   )
   class(obj) <- "sinba_model"
   return(obj)
@@ -492,9 +509,11 @@ single_hidden_model <- function(states) {
       }
       m[i, j] <- p
       p <- p + 1
-      cm[i, j] <- 0
+      cm[i, j] <- 1
     }
   }
+  trait_states <- list()
+  trait_states[["x"]] <- list(trait = "x", states = x_states)
 
   m <- format_model_matrix(m)
   obj <- list(
@@ -502,8 +521,10 @@ single_hidden_model <- function(states) {
     model = m,
     changes = cm,
     traits = 1,
+    rates = 1,
     states = x_states,
-    observed = observed
+    observed = observed,
+    trait_states = trait_states
   )
   class(obj) <- "sinba_model"
   return(obj)
@@ -543,6 +564,28 @@ new_rates_model <- function(model, rates) {
       states <- c(states, s)
       observed[[s]] <- obs[[sts[j]]]
     }
+  }
+
+  trait_states <- list()
+  x_states <- c()
+  for (i in seq_len((length(rates)))) {
+    t <- model$trait_states[["x"]]
+    for (j in seq_len(length(t$states))) {
+      s <- sprintf("%s[%s]", t$states[j], rates[i])
+      x_states <- c(x_states, s)
+    }
+  }
+  trait_states[["x"]] <- list(trait = "x", states = x_states)
+  if (model$traits == 2) {
+    y_states <- c()
+    for (i in seq_len((length(rates)))) {
+      t <- model$trait_states[["y"]]
+      for (j in seq_len(length(t$states))) {
+        s <- sprintf("%s[%s]", t$states[j], rates[i])
+        y_states <- c(y_states, s)
+      }
+    }
+    trait_states[["y"]] <- list(trait = "y", states = y_states)
   }
 
   m <- matrix(0, nrow = length(states), ncol = length(states))
@@ -589,8 +632,11 @@ new_rates_model <- function(model, rates) {
     model = m,
     changes = cm,
     traits = model$traits,
+    rates = length(rates),
     states = states,
-    observed = observed
+    observed = observed,
+    trait_states = trait_states,
+    cat_rates = rates
   )
   class(obj) <- "sinba_model"
   return(obj)
@@ -612,6 +658,9 @@ model_join <- function(x, y) {
   if ((x$traits != 1) || (y$traits != 1)) {
     stop("model_join: `x` and `y` must be single trait models.")
   }
+  if ((x$rates != 1) || (y$rates != 1)) {
+    stop("model_join: `x` and `y` must be single rates models.")
+  }
 
   # rename y states
   y_observed <- list()
@@ -622,6 +671,10 @@ model_join <- function(x, y) {
     y$states[i] <- sn
   }
   y$observed <- y_observed
+
+  trait_states <- list()
+  trait_states[["x"]] <- list(trait = "x", states = x$states)
+  trait_states[["y"]] <- list(trait = "y", states = y$states)
 
   # combine individual states
   observed <- list()
@@ -690,8 +743,10 @@ model_join <- function(x, y) {
     model = m,
     changes = cm,
     traits = 2,
+    rates = 1,
     states = states,
-    observed = observed
+    observed = observed,
+    trait_states = trait_states
   )
   class(obj) <- "sinba_model"
   return(obj)
@@ -745,20 +800,7 @@ model_as <- function(model, def) {
   if (model$traits != 2) {
     return(model)
   }
-
-  is_rates_model <- FALSE
-  for (i in seq_len(nrow(model$changes))) {
-    for (j in seq_len(ncol(model$changes))) {
-      if (model$changes[i, j] == 3) {
-        is_rates_model <- TRUE
-        break
-      }
-    }
-    if (is_rates_model) {
-      break()
-    }
-  }
-  if (is_rates_model) {
+  if (model$rates != 1) {
     return(model)
   }
 
@@ -967,19 +1009,7 @@ model_equate_trans_rates <- function(model) {
     stop("model_equate: `model` must be an object of class \"sinba_model\".")
   }
 
-  is_rates_model <- FALSE
-  for (i in seq_len(nrow(model$changes))) {
-    for (j in seq_len(ncol(model$changes))) {
-      if (model$changes[i, j] == 3) {
-        is_rates_model <- TRUE
-        break
-      }
-    }
-    if (is_rates_model) {
-      break()
-    }
-  }
-  if (!is_rates_model) {
+  if (model$rates == 1) {
     return(model)
   }
 
@@ -1233,4 +1263,58 @@ reduce_matrix <- function(m) {
     }
   }
   return(r)
+}
+
+# state_vector returns a vector with the state locations
+# for a trait.
+state_vector <- function(m, trait) {
+  if (length(m$trait_states) == 1) {
+    states <- m$trait_states[["x"]]
+    return(seq_len(length(states$states)))
+  }
+  t <- m$trait_states[[trait]]
+  if (is.null(t)) {
+    return(c())
+  }
+  state_pos <- rep(0, length(m$states))
+
+  # get the states vector for each trait
+  x_states <- m$trait_states[["x"]]$states
+  y_states <- m$trait_states[["y"]]$states
+
+  # rates model
+  if (m$rates > 1) {
+    for (i in seq_len(length(x_states))) {
+      x_state <- strsplit(x_states[i], split = "[", fixed = TRUE)[[1]]
+      for (j in seq_len(length(y_states))) {
+        y_state <- strsplit(y_states[j], split = "[", fixed = TRUE)[[1]]
+        if (y_state[2] != x_state[2]) {
+          next
+        }
+        s <- sprintf("%s,%s[%s", x_state[1], y_state[1], x_state[2])
+        p <- which(s == m$states)[[1]]
+        if (trait == "x") {
+          state_pos[p] <- i
+        }
+        if (trait == "y") {
+          state_pos[p] <- j
+        }
+      }
+    }
+    return(state_pos)
+  }
+
+  for (i in seq_len(length(x_states))) {
+    for (j in seq_len(length(y_states))) {
+      s <- sprintf("%s,%s", x_states[i], y_states[j])
+      p <- which(s == m$states)[[1]]
+      if (trait == "x") {
+        state_pos[p] <- i
+      }
+      if (trait == "y") {
+        state_pos[p] <- j
+      }
+    }
+  }
+  return(state_pos)
 }
