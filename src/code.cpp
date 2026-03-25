@@ -91,62 +91,110 @@ cpp11::doubles_matrix<> full_conditionals(integers anc, integers desc,
 	return cond;
 }
 
+// FitzJohn prior
+doubles fitzJohnPrior(doubles to, doubles_matrix<> PI_mat, int size)
+{
+	double mx = to[0];
+	for (int i = 1; i < to.size(); i++)
+	{
+		if (to[i] > mx)
+		{
+			mx = to[i];
+		}
+	}
+	double sum = 0;
+	for (int i = 0; i < to.size(); i++)
+	{
+		sum += exp(to[i] - mx);
+	}
+
+	writable::doubles pi(size);
+	for (int i = 0; i < pi.size(); i++)
+	{
+		pi[i] = 0;
+	}
+
+	for (int i = 0; i < PI_mat.ncol(); i++)
+	{
+		for (int j = 0; j < PI_mat.ncol(); j++)
+		{
+			int pos = int(PI_mat(i, j));
+			if (pos == 0)
+			{
+				continue;
+			}
+			pos--;
+			pi[pos] += exp(to[j] - mx) / sum;
+		}
+	}
+	return (pi);
+}
+
+// birthEvent updates the conditionals on a birth event.
+doubles birth_event(doubles to, doubles_matrix<> PI_mat, doubles pi)
+{
+	double sum_pi = 0;
+	for (int i = 0; i < pi.size(); i++)
+	{
+		sum_pi += pi[i];
+	}
+	if (sum_pi < 1e-6)
+	{
+		pi = fitzJohnPrior(to, PI_mat, pi.size());
+	}
+
+	double mx = to[0];
+	for (int i = 1; i < to.size(); i++)
+	{
+		if (to[i] > mx)
+		{
+			mx = to[i];
+		}
+	}
+
+	writable::doubles x(to.size());
+	for (int i = 0; i < to.size(); i++)
+	{
+		double sum = 0;
+		for (int j = 0; j < to.size(); j++)
+		{
+			int pos = int(PI_mat(i, j));
+			if (pos == 0)
+			{
+				continue;
+			}
+			pos--;
+			sum += pi[pos] * exp(to[j] - mx);
+		}
+		x[i] = log(sum) + mx;
+	}
+
+	return (x);
+}
+
 // sinba_conditionals calculates the likelihood conditionals
 // using a vector anc with parent nodes,
 // vector desc with descendant nodes,
 // vector st with the activate status of the node,
-// vector op with the nodes to optimize,
 // vector lengths with the the branch lengths of each edge,
 // a matrix with the conditionals of the tips,
 // the ages (in a brach) of each event,
 // and the Q matrices.
 [[cpp11::register]]
 cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
-					   integers st, integers op,
+					   integers st,
 					   doubles lengths,
 					   writable::doubles_matrix<> cond,
-					   doubles_matrix<> full, doubles_matrix<> semi, doubles_matrix<> root,
 					   double first_age, double second_age,
-					   doubles_matrix<> root_Q, doubles_matrix<> semi_Q, doubles_matrix<> Q)
+					   doubles_matrix<> semi_Q, doubles_matrix<> Q,
+					   doubles semi_pi, doubles root_pi,
+					   doubles_matrix<> semi_PI_mat, doubles_matrix<> root_PI_mat)
 {
-	// copy conditionals
-	for (int i = 0; i < st.size(); i++)
-	{
-		if (op[i] == 1)
-		{
-			continue;
-		}
-		switch (st[i])
-		{
-		case 0:
-			for (int j = 0; j < cond.ncol(); j++)
-			{
-				cond(i, j) = root(i, j);
-			}
-			break;
-		case 1:
-			for (int j = 0; j < cond.ncol(); j++)
-			{
-				cond(i, j) = semi(i, j);
-			}
-			break;
-		case 2:
-			for (int j = 0; j < cond.ncol(); j++)
-			{
-				cond(i, j) = full(i, j);
-			}
-		}
-	}
-
 	// edges are sorted from the root
 	for (int i = desc.size() - 1; i >= 0; i--)
 	{
 		int n = desc[i];
 		int a = anc[n];
-		if (op[a] == 0)
-		{
-			continue;
-		}
 
 		writable::doubles to(cond.ncol());
 		for (int j = 0; j < cond.ncol(); j++)
@@ -165,12 +213,28 @@ cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
 				double len = lengths[n] - second_age;
 				doubles tmp2 = conditional(to, Q, len);
 
+				// update the conditionals with the event
+				tmp2 = birth_event(tmp2, semi_PI_mat, semi_pi);
+
 				// then we calculate the conditional for the birth of the semi-active process.
 				len = second_age - first_age;
+				if (len < 1e-6)
+				{
+					// simultaneous birth
+					// update the conditionals with the event
+					tmp2 = birth_event(tmp2, root_PI_mat, root_pi);
+
+					// we move directly to the inactive state
+					from = tmp2;
+					break;
+				}
 				doubles tmp1 = conditional(tmp2, semi_Q, len);
 
+				// update the conditionals with the event
+				tmp1 = birth_event(tmp1, root_PI_mat, root_pi);
+
 				// finally we calculate the conditional for the inactive process.
-				from = conditional(tmp1, root_Q, first_age);
+				from = tmp1;
 				break;
 			}
 			if (st[n] == 1)
@@ -179,8 +243,11 @@ cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
 				double len = lengths[n] - first_age;
 				doubles tmp1 = conditional(to, semi_Q, len);
 
+				// update the conditionals with the event
+				tmp1 = birth_event(tmp1, root_PI_mat, root_pi);
+
 				// then we calculate the conditional for the inactive process.
-				from = conditional(tmp1, root_Q, first_age);
+				from = tmp1;
 				break;
 			}
 
@@ -194,6 +261,9 @@ cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
 				double len = lengths[n] - second_age;
 				doubles tmp2 = conditional(to, Q, len);
 
+				// update the conditionals with the event
+				tmp2 = birth_event(tmp2, semi_PI_mat, semi_pi);
+
 				// then we calculate the conditional for the semi-active process.
 				from = conditional(tmp2, semi_Q, second_age);
 				break;
@@ -202,6 +272,9 @@ cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc,
 			// semi-active process.
 			from = conditional(to, semi_Q, lengths[n]);
 			break;
+		default:
+			// full process.
+			from = conditional(to, Q, lengths[n]);
 		}
 
 		for (int j = 0; j < cond.ncol(); j++)
@@ -262,7 +335,7 @@ cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc,
 				doubles tmp1 = conditional(tmp2, semi_Q, len);
 
 				// finally we calculate the conditional for the inactive process.
-				from = conditional(tmp1, root_Q, first_age);
+				from = tmp1;
 				break;
 			}
 			if (st[n] == 1)
@@ -272,12 +345,12 @@ cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc,
 				doubles tmp1 = conditional(to, semi_Q, len);
 
 				// then we calculate the conditional for the inactive process.
-				from = conditional(tmp1, root_Q, first_age);
+				from = tmp1;
 				break;
 			}
 
 			// inactive process.
-			from = conditional(to, root_Q, lengths[n]);
+			from = to;
 			break;
 		case 1:
 			if (st[n] == 2)

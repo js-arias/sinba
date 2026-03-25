@@ -192,3 +192,109 @@ update_root <- function(t, root, births, youngest) {
   }
   return(root_prob)
 }
+
+# creates the pi matrix for the birth of an event.
+# the pi matrix is really the P matrix
+# (the probability matrix)
+# used in a birth event.
+build_pi_matrix <- function(m, trait, root) {
+  pi <- matrix(0, nrow = length(m$states), ncol = length(m$states))
+  v <- state_vector(m, trait)
+  for (i in seq_len(nrow(pi))) {
+    pi[i, ] <- v
+  }
+  if (m$traits == 1) {
+    states <- m$states
+
+    # remove states not in the root
+    names(root) <- c("0", "1")
+    for (i in seq_len(length(states))) {
+      from <- m$observed[[states[i]]]
+      if (root[from] != 0) {
+        next
+      }
+      pi[i, ] <- 0
+    }
+
+    if (m$rates == 1) {
+      return(pi)
+    }
+    # multiple rates model
+    for (i in seq_len(length(states))) {
+      row_state <- strsplit(states[i], split = "[", fixed = TRUE)[[1]]
+      for (j in seq_len(length(states))) {
+        col_state <- strsplit(states[j], split = "[", fixed = TRUE)[[1]]
+        if (row_state[2] == col_state[2]) {
+          # skip if rates are the same
+          next
+        }
+        # we only change inside the same rate
+        pi[i, j] <- 0
+      }
+    }
+    return(pi)
+  }
+  cm <- matrix(0, nrow = 4, ncol = 4)
+  if (trait == "x") {
+    cm[1, 3] <- 1
+    cm[2, 4] <- 1
+    cm[3, 1] <- 1
+    cm[4, 2] <- 1
+  } else {
+    cm[2, 1] <- 1
+    cm[1, 2] <- 1
+    cm[3, 4] <- 1
+    cm[4, 3] <- 1
+  }
+  rownames(cm) <- c("00", "01", "10", "11")
+  colnames(cm) <- c("00", "01", "10", "11")
+  names(root) <- c("00", "01", "10", "11")
+
+  states <- m$states
+  for (i in seq_len(length(states))) {
+    from <- m$observed[[states[i]]]
+    if (root[from] == 0) {
+      pi[i, ] <- 0
+      next
+    }
+    for (j in seq_len(length(states))) {
+      if (i == j) {
+        # skip diagonal
+        next
+      }
+
+      # in a rates model we should be in the same rate
+      if (m$rates > 1) {
+        row_state <- strsplit(states[i], split = "[", fixed = TRUE)[[1]]
+        col_state <- strsplit(states[j], split = "[", fixed = TRUE)[[1]]
+        if (row_state[2] != col_state[2]) {
+          pi[i, j] <- 0
+          next
+        }
+      }
+      to <- m$observed[[states[j]]]
+      if (cm[from, to] != 0) {
+        next
+      }
+      pi[i, j] <- 0
+    }
+  }
+
+  return(pi)
+}
+
+active_ancestor_vector <- function(sc) {
+  if (sc == "12") {
+    return(c(1, 1, 0, 0))
+  }
+  if (sc == "13") {
+    return(c(1, 0, 1, 0))
+  }
+  if (sc == "24") {
+    return(c(0, 1, 0, 1))
+  }
+  if (sc == "34") {
+    return(c(0, 0, 1, 1))
+  }
+  stop(sprintf("invalid scenario: '%s'", sc))
+}

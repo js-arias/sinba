@@ -4,8 +4,8 @@ full_conditionals <- function(anc, desc, lengths, cond, Q) {
   .Call(`_sinba_full_conditionals`, anc, desc, lengths, cond, Q)
 }
 
-sinba_conditionals <- function(anc, desc, st, op, lengths, cond, full, semi, root, first_age, second_age, root_Q, semi_Q, Q) {
-  .Call(`_sinba_sinba_conditionals`, anc, desc, st, op, lengths, cond, full, semi, root, first_age, second_age, root_Q, semi_Q, Q)
+sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_age, semi_Q, Q, semi_pi, root_pi, semi_PI_mat, root_PI_mat) {
+  .Call(`_sinba_sinba_conditionals`, anc, desc, st, lengths, cond, first_age, second_age, semi_Q, Q, semi_pi, root_pi, semi_PI_mat, root_PI_mat)
 }
 
 full_sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_age, root_Q, semi_Q, Q) {

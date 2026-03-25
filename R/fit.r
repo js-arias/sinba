@@ -3,7 +3,7 @@
 # Maximum transition rate.
 # This maximum is used as very large transition rates
 # produce matrices that cannot be exponentiated.
-maximum_transition_rate <- 200
+maximum_transition_rate <- 1000
 
 #' @export
 #' @title
@@ -25,22 +25,23 @@ maximum_transition_rate <- 200
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
-#' @param ev_prob Set the probability of a birth event.
-#'   By default is 1
-#'   (i.e., we have observed different states in the traits).
 #' @param single_birth If true,
 #'   it will set the birth of both traits in the same location
 #'   (reducing one parameter).
+#' @param pi_x The transition probability at the birth of x trait.
+#'   If NULL it will use a FitzJohn prior.
+#' @param pi_y The transition probability at the birth of y trait.
+#'   If NULL it will use a FitzJohn prior.
 #' @param root Set the root state.
 #'   By default,
-#'   the root state will be optimized as a parameter.
+#'   the root state will be picked by maximum likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(
     tree, data, model = NULL,
     single_birth = FALSE,
-    ev_prob = 1,
+    pi_x = NULL, pi_y = NULL,
     root = "",
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
@@ -60,6 +61,13 @@ fit_sinba <- function(
     k <- max(mQ) + 1
   }
 
+  if (is.null(pi_x)) {
+    pi_x <- rep(0, length(model$trait_states[["x"]]$states))
+  }
+  if (is.null(pi_y)) {
+    pi_y <- rep(0, length(model$trait_states[["y"]]$states))
+  }
+
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
@@ -70,14 +78,14 @@ fit_sinba <- function(
     }
   }
 
-  ev_prob <- 2 * log(ev_prob)
-
   # separate birth parameters
   # from transition (traditional) parameters
   transition_start <- 3
   if (single_birth) {
     transition_start <- 2
   }
+
+  max_rate <- maximum_transition_rate / max(t$ages)
 
   # closure for the likelihood function
   like_func <- function(yn, r) {
@@ -87,7 +95,7 @@ fit_sinba <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p[transition_start:length(p)] > maximum_transition_rate)) {
+      if (any(p[transition_start:length(p)] > max_rate)) {
         return(Inf)
       }
 
@@ -112,7 +120,7 @@ fit_sinba <- function(
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        r, ev_prob
+        r, pi_x, pi_y
       )
       return(-lk)
     })
@@ -192,12 +200,6 @@ fit_sinba <- function(
       v <- scenario(res$root, 2)
     }
     sc <- v
-  }
-
-  # if we have to calculate the root,
-  # we add a parameter.
-  if (root == "") {
-    k <- k + 1
   }
 
   obj <- list(
@@ -920,10 +922,17 @@ fixed_sinba <- function(
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(
-    t, Q, model, births, xt, cond, root, ev_prob) {
+    t, Q, model, births, xt, cond, root, pi_x, pi_y) {
   Q <- normalize_Q(Q)
 
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
+
+  root_vector <- rep(0, 4)
+  root_vector[root] <- 1
+  m_PI_semi <- matrix()
+  m_PI_root <- matrix()
+  pi_semi <- pi_x
+  pi_root <- pi_y
 
   b1 <- births[[1]]
   b2 <- births[[2]]
@@ -959,6 +968,11 @@ sinba_like <- function(
         Q = Q
       )
     )
+    anc_vector <- active_ancestor_vector(sc)
+    m_PI_semi <- build_pi_matrix(model, "y", anc_vector)
+    m_PI_root <- build_pi_matrix(model, "x", root_vector)
+    pi_semi <- pi_y
+    pi_root <- pi_x
   } else {
     # second trait is the oldest one
     sc <- scenario(root, 2)
@@ -980,16 +994,31 @@ sinba_like <- function(
         Q = Q
       )
     )
+    anc_vector <- active_ancestor_vector(sc)
+    m_PI_semi <- build_pi_matrix(model, "x", anc_vector)
+    m_PI_root <- build_pi_matrix(model, "y", root_vector)
+    pi_semi <- pi_x
+    pi_root <- pi_y
   }
 
   st <- as.integer(active_status(t, ev$first$node, ev$second$node))
 
-  l <- full_sinba_conditionals(
+  l <- sinba_conditionals(
     xt$parent, xt$nodes, st, xt$branch,
     cond,
     ev$first$age, ev$second$age,
-    root_Q, ev$first$Q, ev$second$Q
+    ev$first$Q, ev$second$Q,
+    pi_semi, pi_root,
+    m_PI_semi, m_PI_root
   )
+  # print(l)
+
+  # l <- full_sinba_conditionals(
+  #  xt$parent, xt$nodes, st, xt$branch,
+  #  cond,
+  #  ev$first$age, ev$second$age,
+  #  root_Q, ev$first$Q, ev$second$Q
+  # )
 
   # takes into account the hidden states
   root_states <- c("00", "01", "10", "11")
@@ -1000,15 +1029,17 @@ sinba_like <- function(
       likes <- c(likes, l[t$root_id, i])
     }
   }
+
   scaled <- exp(likes - max(likes))
   fitz <- scaled / sum(scaled)
   like <- log(sum(fitz * scaled)) + max(likes)
+
   return(like)
 }
 
 # provide a default nloptr options
 def_nloptr_opts <- function(k) {
-  v <- 1e-6
+  v <- 1e-12
   return(list(
     "algorithm" = "NLOPT_LN_SBPLX",
     xtol_abs = rep(v, k),
