@@ -61,11 +61,23 @@ fit_sinba <- function(
     k <- max(mQ) + 1
   }
 
-  if (is.null(pi_x)) {
+  if ((is.null(pi_x)) || (sum(pi_x) == 0)) {
     pi_x <- rep(0, length(model$trait_states[["x"]]$states))
   }
-  if (is.null(pi_y)) {
+  if ((is.null(pi_y)) || (sum(pi_y) == 0)) {
     pi_y <- rep(0, length(model$trait_states[["y"]]$states))
+  }
+  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
+    stop("fit_sinba: invalid pi_x: size different to number of states")
+  }
+  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
+    stop("fit_sinba: invalid pi_y: size different to number of states")
+  }
+  if (sum(pi_x) != 0) {
+    pi_x <- pi_x / sum(pi_x)
+  }
+  if (sum(pi_y) != 0) {
+    pi_y <- pi_y / sum(pi_y)
   }
 
   et <- encode_traits(t, data, 2)
@@ -923,6 +935,51 @@ fixed_sinba <- function(
 # of the sinba model.
 sinba_like <- function(
     t, Q, model, births, xt, cond, root, pi_x, pi_y) {
+  l <- sinba_cond(t, Q, model, births, xt, cond, root, pi_x, pi_y)
+
+  likes <- l[t$root_id, ]
+  scaled <- exp(likes - max(likes))
+
+  # both traits are FitzJohn
+  if ((sum(pi_x) == 0) && (sum(pi_y) == 0)) {
+    fitz <- scaled / sum(scaled)
+    like <- log(sum(fitz * scaled)) + max(likes)
+    return(like)
+  }
+
+  v_x <- state_vector(model, "x")
+  v_y <- state_vector(model, "y")
+
+  # only a single trait is FitzJohn
+  if (sum(pi_x) == 0) {
+    scaled_sum <- sum(scaled)
+    for (i in seq_len(length(scaled))) {
+      pos <- v_x[i]
+      pi_x[pos] <- pi_x[pos] + scaled[i] / scaled_sum
+    }
+  }
+  if (sum(pi_y) == 0) {
+    scaled_sum <- sum(scaled)
+    for (i in seq_len(length(scaled))) {
+      pos <- v_y[i]
+      pi_y[pos] <- pi_y[pos] + scaled[i] / scaled_sum
+    }
+  }
+
+  # build_full_pi
+  pi <- rep(0, length(model$states))
+  for (i in seq_len(length(pi))) {
+    pi[i] <- pi_x[v_x[i]] * pi_y[v_y[i]]
+  }
+
+  like <- log(sum(pi * scaled)) + max(likes)
+  return(like)
+}
+
+# sinba_cond return the conditional likelihoods
+# under the sinba model.
+sinba_cond <- function(
+    t, Q, model, births, xt, cond, root, pi_x, pi_y) {
   Q <- normalize_Q(Q)
 
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
@@ -1011,7 +1068,6 @@ sinba_like <- function(
     pi_semi, pi_root,
     m_PI_semi, m_PI_root
   )
-  # print(l)
 
   # l <- full_sinba_conditionals(
   #  xt$parent, xt$nodes, st, xt$branch,
@@ -1019,22 +1075,7 @@ sinba_like <- function(
   #  ev$first$age, ev$second$age,
   #  root_Q, ev$first$Q, ev$second$Q
   # )
-
-  # takes into account the hidden states
-  root_states <- c("00", "01", "10", "11")
-  likes <- c()
-  for (i in seq_len(ncol(l))) {
-    obs <- model$observed[[model$states[i]]]
-    if (obs == root_states[root]) {
-      likes <- c(likes, l[t$root_id, i])
-    }
-  }
-
-  scaled <- exp(likes - max(likes))
-  fitz <- scaled / sum(scaled)
-  like <- log(sum(fitz * scaled)) + max(likes)
-
-  return(like)
+  return(l)
 }
 
 # provide a default nloptr options
