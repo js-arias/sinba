@@ -32,9 +32,9 @@ maximum_transition_rate <- 1000
 #'   If NULL it will use a FitzJohn prior.
 #' @param pi_y The transition probability at the birth of y trait.
 #'   If NULL it will use a FitzJohn prior.
-#' @param root Set the root state.
+#' @param root Root prior probabilities.
 #'   By default,
-#'   the root state will be picked by maximum likelihood.
+#'   it uses a FitzJohn prior.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -42,7 +42,7 @@ fit_sinba <- function(
     tree, data, model = NULL,
     single_birth = FALSE,
     pi_x = NULL, pi_y = NULL,
-    root = "",
+    root = NULL,
     opts = NULL) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
@@ -80,15 +80,15 @@ fit_sinba <- function(
     pi_y <- pi_y / sum(pi_y)
   }
 
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
+
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
-
-  root_states <- c("00", "01", "10", "11")
-  if (root != "") {
-    if (!(root %in% root_states)) {
-      stop("fit_sinba: invalid root state.")
-    }
-  }
 
   # separate birth parameters
   # from transition (traditional) parameters
@@ -132,7 +132,7 @@ fit_sinba <- function(
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        r, pi_x, pi_y
+        r, pi_x, pi_y, root
       )
       return(-lk)
     })
@@ -145,10 +145,19 @@ fit_sinba <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
+  root_states <- c("00", "01", "10", "11")
+
   res <- list(objective = Inf)
   for (r in sample(seq_len(length(root_states)))) {
-    if (root != "") {
-      if (root != root_states[r]) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
         next
       }
     }
@@ -934,45 +943,20 @@ fixed_sinba <- function(
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(
-    t, Q, model, births, xt, cond, root, pi_x, pi_y) {
+    t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root) {
   l <- sinba_cond(t, Q, model, births, xt, cond, root, pi_x, pi_y)
 
   likes <- l[t$root_id, ]
   scaled <- exp(likes - max(likes))
 
-  # both traits are FitzJohn
-  if ((sum(pi_x) == 0) && (sum(pi_y) == 0)) {
+  # FitzJohn root
+  if (sum(pi_root) == 0) {
     fitz <- scaled / sum(scaled)
     like <- log(sum(fitz * scaled)) + max(likes)
     return(like)
   }
 
-  v_x <- state_vector(model, "x")
-  v_y <- state_vector(model, "y")
-
-  # only a single trait is FitzJohn
-  if (sum(pi_x) == 0) {
-    scaled_sum <- sum(scaled)
-    for (i in seq_len(length(scaled))) {
-      pos <- v_x[i]
-      pi_x[pos] <- pi_x[pos] + scaled[i] / scaled_sum
-    }
-  }
-  if (sum(pi_y) == 0) {
-    scaled_sum <- sum(scaled)
-    for (i in seq_len(length(scaled))) {
-      pos <- v_y[i]
-      pi_y[pos] <- pi_y[pos] + scaled[i] / scaled_sum
-    }
-  }
-
-  # build_full_pi
-  pi <- rep(0, length(model$states))
-  for (i in seq_len(length(pi))) {
-    pi[i] <- pi_x[v_x[i]] * pi_y[v_y[i]]
-  }
-
-  like <- log(sum(pi * scaled)) + max(likes)
+  like <- log(sum(pi_root * scaled)) + max(likes)
   return(like)
 }
 
