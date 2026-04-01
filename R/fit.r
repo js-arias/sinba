@@ -25,9 +25,6 @@ maximum_transition_rate <- 1000
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
-#' @param single_birth If true,
-#'   it will set the birth of both traits in the same location
-#'   (reducing one parameter).
 #' @param pi_x The transition probability at the birth of x trait.
 #'   If NULL it will use a FitzJohn prior.
 #' @param pi_y The transition probability at the birth of y trait.
@@ -40,7 +37,6 @@ maximum_transition_rate <- 1000
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(
     tree, data, model = NULL,
-    single_birth = FALSE,
     pi_x = NULL, pi_y = NULL,
     root = NULL,
     opts = NULL) {
@@ -57,9 +53,6 @@ fit_sinba <- function(
   }
   mQ <- model$model
   k <- max(mQ) + 2
-  if (single_birth) {
-    k <- max(mQ) + 1
-  }
 
   if (length(pi_x) == 0) {
     pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
@@ -94,9 +87,6 @@ fit_sinba <- function(
   # separate birth parameters
   # from transition (traditional) parameters
   transition_start <- 3
-  if (single_birth) {
-    transition_start <- 2
-  }
 
   max_rate <- maximum_transition_rate / max(t$ages)
 
@@ -115,10 +105,6 @@ fit_sinba <- function(
       births <- list()
       for (i in 1:2) {
         j <- i
-        if (single_birth) {
-          j <- 1
-        }
-
         n <- get_node_by_len(t, p[j], yn[j])
         if (n <= 0) {
           return(Inf)
@@ -173,13 +159,6 @@ fit_sinba <- function(
         runif(1, max = t$age[e[1]]),
         runif(1, max = t$age[e[2]]), runif(k - 2)
       )
-      if (single_birth) {
-        max_age <- t$age[e[1]]
-        if (max_age > t$age[e[2]]) {
-          max_age <- t$age[e[2]]
-        }
-        par <- c(runif(1, max = max_age), runif(k - 1))
-      }
       rr <- nloptr::nloptr(
         x0 = par,
         eval_f = fn,
@@ -198,9 +177,6 @@ fit_sinba <- function(
   births <- list()
   for (i in 1:2) {
     j <- i
-    if (single_birth) {
-      j <- 1
-    }
     n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
     if (n <= 0) {
       return(Inf)
@@ -214,14 +190,10 @@ fit_sinba <- function(
   root_state <- root_states[res$root]
 
   # retrieve the scenario
-  sc <- NULL
-  if (!single_birth) {
-    v <- scenario(res$root, 1)
-    if (res$solution[2] < res$solution[1]) {
-      # second trait is the oldest one
-      v <- scenario(res$root, 2)
-    }
-    sc <- v
+  sc <- scenario(res$root, 1)
+  if (res$solution[2] < res$solution[1]) {
+    # second trait is the oldest one
+    sc <- scenario(res$root, 2)
   }
 
   obj <- list(
