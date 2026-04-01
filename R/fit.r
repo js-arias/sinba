@@ -61,12 +61,13 @@ fit_sinba <- function(
     k <- max(mQ) + 1
   }
 
-  if ((is.null(pi_x)) || (sum(pi_x) == 0)) {
-    pi_x <- rep(0, length(model$trait_states[["x"]]$states))
+  if (length(pi_x) == 0) {
+    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
   }
-  if ((is.null(pi_y)) || (sum(pi_y) == 0)) {
-    pi_y <- rep(0, length(model$trait_states[["y"]]$states))
+  if (length(pi_y) == 0) {
+    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
   }
+
   if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
     stop("fit_sinba: invalid pi_x: size different to number of states")
   }

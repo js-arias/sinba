@@ -298,3 +298,17 @@ active_ancestor_vector <- function(sc) {
   }
   stop(sprintf("invalid scenario: '%s'", sc))
 }
+
+default_pi_vector <- function(states) {
+  pi <- rep(0, length(states))
+  for (i in seq_len(length(states))) {
+    s <- strsplit(states[i], split = "", fixed = TRUE)[[1]]
+    if (length(s) < 2) {
+      next
+    }
+    if (s[2] == "1") {
+      pi[i] <- 1
+    }
+  }
+  return(pi)
+}
