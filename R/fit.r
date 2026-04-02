@@ -11,7 +11,7 @@ maximum_transition_rate <- 1000
 #'
 #' @description
 #' `fit_sinba()` searches for the maximum likelihood estimate
-#' with the Sinba model for two traits.
+#' with the Sinba model for one or two traits.
 #' It estimate the values of the parameters for the Q matrices
 #' as well as the birth events.
 #'
@@ -26,9 +26,9 @@ maximum_transition_rate <- 1000
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param pi_x The transition probability at the birth of x trait.
-#'   If NULL it will use a FitzJohn prior.
+#'   If NULL it will set 1.0 for the state 1.
 #' @param pi_y The transition probability at the birth of y trait.
-#'   If NULL it will use a FitzJohn prior.
+#'   If NULL it will set 1.0 for the state 1.
 #' @param root Root prior probabilities.
 #'   By default,
 #'   it uses a FitzJohn prior.
@@ -40,10 +40,6 @@ fit_sinba <- function(
     pi_x = NULL, pi_y = NULL,
     root = NULL,
     opts = NULL) {
-  if (!inherits(tree, "phylo")) {
-    stop("fit_sinba: `tree` must be an object of class \"phylo\".")
-  }
-  t <- phylo_to_sinba(tree)
 
   if (is.null(model)) {
     model <- new_model("IND")
@@ -51,8 +47,17 @@ fit_sinba <- function(
   if (!inherits(model, "sinba_model")) {
     stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
   }
+  if (model$traits == 1) {
+    return(fit_sinba_single(tree, data, model, pi_x, opts))
+  }
   mQ <- model$model
   k <- max(mQ) + 2
+
+  if (!inherits(tree, "phylo")) {
+    stop("fit_sinba: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
 
   if (length(pi_x) == 0) {
     pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
@@ -919,17 +924,20 @@ sinba_like <- function(
     t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root) {
   l <- sinba_cond(t, Q, model, births, xt, cond, root, pi_x, pi_y)
 
-  likes <- l[t$root_id, ]
+  return(add_root_prior(l[t$root_id, ], pi_root))
+}
+
+add_root_prior <- function(likes, pi) {
   scaled <- exp(likes - max(likes))
 
   # FitzJohn root
-  if (sum(pi_root) == 0) {
+  if (sum(pi) == 0) {
     fitz <- scaled / sum(scaled)
     like <- log(sum(fitz * scaled)) + max(likes)
     return(like)
   }
 
-  like <- log(sum(pi_root * scaled)) + max(likes)
+  like <- log(sum(pi * scaled)) + max(likes)
   return(like)
 }
 

@@ -1,66 +1,31 @@
-#' @export
-#' @title
-#' Maximum Likelihood Estimation of the Sinba Model in a Single Trait
-#'
-#' @description
-#' `fit_sinba_single()` searches for the maximum likelihood estimate
-#' with the Sinba model
-#' for a single trait.
-#'
-#' @param tree A phylogenetic tree of class "phylo".
-#' @param data A data frame with the data.
-#'   The first column should contain the taxon names,
-#'   A second should contain the data,
-#'   coded as 0 and 1.
-#'   Any other column will be ignored.
-#' @param model A model build with `new_model()`,
-#'   `new_hidden_model()`,
-#'   or `new_rates_model()`.
-#'   The model must be defined for a single trait.
-#' @param ev_prob Det the probability of a birth event.
-#'   By default is 1
-#'   (i.e., we have observed different states in the traits).
-#' @param root Set the root state.
-#'   By default,
-#'   the root state will be optimized as a parameter.
-#' @param opts User defined parameters for the optimization
-#'   with the `nloptr` package.
-#'   By default it attempts a reasonable set of options.
 fit_sinba_single <- function(
-    tree, data, model = NULL,
-    ev_prob = 1,
-    root = "",
-    opts = NULL) {
+    tree, data, model,
+    pi_x,
+    opts) {
   if (!inherits(tree, "phylo")) {
-    stop("fit_sinba_single: `tree` must be an object of class \"phylo\".")
+    stop("fit_sinba: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
-  if (is.null(model)) {
-    model <- new_model(traits = 1)
-  }
-  if (!inherits(model, "sinba_model")) {
-    stop(
-      "fit_sinba_single: `model` must be an object of class \"sinba_model\"."
-    )
-  }
-  if (model$traits != 1) {
-    stop("fit_sinba_single: `model` must be for a single trait.")
-  }
   mQ <- model$model
   k <- max(mQ) + 1
+
+  if (length(pi_x) == 0) {
+    pi_x <- default_pi_vector(model$states)
+  }
+
+  if (length(pi_x) != length(model$states)) {
+    stop("fit_sinba: invalid pi_x: size different to number of states")
+  }
+  if (sum(pi_x) != 0) {
+    pi_x <- pi_x / sum(pi_x)
+  }
+  pi_root <- rep(0, length(pi_x))
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
 
-  root_states <- c("0", "1")
-  if (root != "") {
-    if (!(root %in% root_states)) {
-      stop("fit_sinba_single: invalid root state.")
-    }
-  }
-
-  ev_prob <- log(ev_prob)
+  max_rate <- maximum_transition_rate / max(t$ages)
 
   # closure for the likelihood function
   like_func <- function(yn, r) {
@@ -71,7 +36,7 @@ fit_sinba_single <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p[2:length(p)] > 1000)) {
+      if (any(p[2:length(p)] > max_rate)) {
         return(Inf)
       }
       if (p[1] > max_len) {
@@ -88,7 +53,7 @@ fit_sinba_single <- function(
       Q <- from_model_to_Q(mQ, p[2:length(p)])
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
-        r, ev_prob
+        r, pi_x, pi_root
       )
       return(-lk)
     })
@@ -101,14 +66,10 @@ fit_sinba_single <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
+  root_states <- c("0", "1")
+
   res <- list(objective = Inf)
   for (r in sample(seq_len(length(root_states)))) {
-    if (root != "") {
-      if (root != root_states[r]) {
-        next
-      }
-    }
-
     youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     fn <- like_func(yn, r)
@@ -133,12 +94,6 @@ fit_sinba_single <- function(
     age = t$br_len[n] + res$solution[1] - t$age[n]
   )
   root_state <- root_states[res$root]
-
-  # if we have to calculate the root,
-  # we add a parameter.
-  if (root == "") {
-    k <- k + 1
-  }
 
   obj <- list(
     logLik = -res$objective,
@@ -367,30 +322,37 @@ fixed_sinba_single <- function(
 # under the sinba model.
 sinba_single_like <- function(
     t, Q, model, birth,
-    xt, cond, root, ev_prob) {
+    xt, cond, root, pi_x, pi_root) {
+  l <- sinba_single_cond(t, Q, model, birth, xt, cond, root, pi_x)
+
+  return(add_root_prior(l[t$root_id, ], pi_root))
+}
+
+sinba_single_cond <- function(
+    t, Q, model, birth,
+    xt, cond, root, pi_x) {
   # make sure the Q matrix is valid
   Q <- normalize_Q(Q)
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
+  m_PI_root <- build_pi_matrix(model, "x", state_vector(model, "x"))
 
   st <- as.integer(active_status(t, birth$node, length(t$parent) + 1))
-  l <- full_sinba_conditionals(
+
+  l <- sinba_conditionals(
     xt$parent, xt$nodes, st, xt$branch,
     cond,
     birth$age, 0,
-    root_Q, Q, root_Q
+    Q, Q,
+    pi_x, pi_x,
+    m_PI_root, m_PI_root
   )
 
-  # takes into account the hidden states
-  root_states <- c("0", "1")
-  likes <- c()
-  for (i in seq_len(ncol(l))) {
-    obs <- model$observed[[model$states[i]]]
-    if (obs == root_states[root]) {
-      likes <- c(likes, l[t$root_id, i])
-    }
-  }
-  scaled <- exp(likes - max(likes))
-  fitz <- scaled / sum(scaled)
-  like <- log(sum(fitz * scaled)) + max(likes)
-  return(like)
+  #  l <- full_sinba_conditionals(
+  #    xt$parent, xt$nodes, st, xt$branch,
+  #    cond,
+  #    birth$age, 0,
+  #    root_Q, Q, root_Q
+  #  )
+
+  return(l)
 }
