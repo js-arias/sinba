@@ -307,6 +307,120 @@ fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
   return(obj)
 }
 
+fit_sinba_single_fixed_matrix <- function(
+    tree, data, rate_mat, model,
+    pi_x, opts) {
+  if (!inherits(tree, "phylo")) {
+    stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  k <- 1
+
+  if (is.null(rate_mat)) {
+    stop("fit_fixed_matrix: `rate_mat` must be a matrix")
+  }
+  if (nrow(rate_mat) != ncol(rate_mat)) {
+    stop("fit_fixed_matrix: `rate_mat` must be a square matrix")
+  }
+  if (nrow(rate_mat) != nrow(model$model)) {
+    stop(
+      "fit_fixed_matrix: `rate_mat` must have the same size as the `model`"
+    )
+  }
+  if (length(pi_x) == 0) {
+    pi_x <- default_pi_vector(model$states)
+  }
+
+  if (length(pi_x) != length(model$states)) {
+    stop("fit_fixed_matrix: invalid pi_x: size different to number of states")
+  }
+  if (sum(pi_x) != 0) {
+    pi_x <- pi_x / sum(pi_x)
+  }
+  pi_root <- rep(0, length(pi_x))
+
+  et <- encode_traits(t, data, 1)
+  cond <- set_conditionals(t, et, model)
+
+  # closure for the likelihood function
+  like_func <- function(yn, r) {
+    max_len <- t$age[yn]
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (p[1] < 0) {
+        return(Inf)
+      }
+      if (p[1] > max_len) {
+        return(Inf)
+      }
+      n <- get_node_by_len(t, p[1], yn)
+      if (n <= 0) {
+        return(Inf)
+      }
+      birth <- list(
+        node = n,
+        age = t$br_len[n] + p[1] - t$age[n]
+      )
+
+      lk <- sinba_single_like(
+        t, rate_mat, model, birth, xt, cond,
+        r, pi_x, pi_root
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    opts <- def_nloptr_opts(k)
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  root_states <- c("0", "1")
+
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    youngest <- youngest_birth_event(t, et, root_states[r])
+    yn <- youngest[[1]]
+    fn <- like_func(yn, r)
+    par <- runif(1, max = t$age[yn])
+    rr <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    if (rr$objective < res$objective) {
+      rr$root <- r
+      rr$yn <- yn
+      res <- rr
+    }
+  }
+
+  q <- normalize_Q(rate_mat)
+  n <- get_node_by_len(t, res$solution[1], res$yn)
+  birth <- list(
+    node = n,
+    age = t$br_len[n] + res$solution[1] - t$age[n]
+  )
+  root_state <- root_states[res$root]
+
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    birth = birth,
+    root = root_state,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba_single"
+  return(obj)
+}
+
 #' @export
 #' @title
 #' Estimate the Likelihood for a Given Sinba Transition Matrix in a Single Trait

@@ -581,7 +581,7 @@ fit_fixed_births <- function(
 #'
 #' @description
 #' `fit_fixed_matrix()` searches for the maximum likelihood estimate
-#' of birth events of two traits
+#' of birth events
 #' given a transition matrix
 #' under the Sinba model.
 #'
@@ -596,26 +596,22 @@ fit_fixed_births <- function(
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
-#' @param ev_prob Set the probability of a birth event.
-#'   By default is 1
-#'   (i.e., we have observed different states in the traits).
-#' @param root Set the root state.
+#' @param pi_x The transition probability at the birth of x trait.
+#'   If NULL it will set 1.0 for the state 1.
+#' @param pi_y The transition probability at the birth of y trait.
+#'   If NULL it will set 1.0 for the state 1.
+#' @param root Root prior probabilities.
 #'   By default,
-#'   the root state will be optimized as a parameter.
+#'   it uses a FitzJohn prior.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_matrix <- function(
     tree, data, rate_mat,
     model = NULL,
-    ev_prob = 1,
-    root = "",
+    pi_x = NULL, pi_y = NULL,
+    root = NULL,
     opts = NULL) {
-  if (!inherits(tree, "phylo")) {
-    stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
-  }
-  t <- phylo_to_sinba(tree)
-
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -624,6 +620,19 @@ fit_fixed_matrix <- function(
       "fit_fixed_matrix: `model` must be an object of class \"sinba_model\"."
     )
   }
+  if (model$traits == 1) {
+    return(fit_sinba_single_fixed_matrix(
+      tree, data, rate_mat, model, pi_x, opts
+    ))
+  }
+
+  k <- 2
+
+  if (!inherits(tree, "phylo")) {
+    stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
   if (is.null(rate_mat)) {
     stop("fit_fixed_matrix: `rate_mat` must be a matrix")
   }
@@ -634,19 +643,28 @@ fit_fixed_matrix <- function(
     stop("fit_fixed_matrix: `rate_mat` must have the same size as the `model`")
   }
 
-  k <- 2
+  if (length(pi_x) == 0) {
+    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+  }
+  if (length(pi_y) == 0) {
+    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+  }
+
+  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
+    stop("fit_fixed_matrix: invalid pi_x: size different to number of states")
+  }
+  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
+    stop("fit_fixed_matrix: invalid pi_y: size different to number of states")
+  }
+  if (sum(pi_x) != 0) {
+    pi_x <- pi_x / sum(pi_x)
+  }
+  if (sum(pi_y) != 0) {
+    pi_y <- pi_y / sum(pi_y)
+  }
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
-
-  root_states <- c("00", "01", "10", "11")
-  if (root != "") {
-    if (!(root %in% root_states)) {
-      stop("fit_fixed_matrix: invalid root state.")
-    }
-  }
-
-  ev_prob <- 2 * log(ev_prob)
 
   # closure for the likelihood function
   like_func <- function(yn, r) {
@@ -672,7 +690,7 @@ fit_fixed_matrix <- function(
 
       lk <- sinba_like(
         t, rate_mat, model, births, xt, cond,
-        r, ev_prob
+        r, pi_x, pi_y, root
       )
       return(-lk)
     })
@@ -685,10 +703,19 @@ fit_fixed_matrix <- function(
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
+  root_states <- c("00", "01", "10", "11")
+
   res <- list(objective = Inf)
   for (r in sample(seq_len(length(root_states)))) {
-    if (root != "") {
-      if (root != root_states[r]) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
         next
       }
     }
@@ -737,12 +764,6 @@ fit_fixed_matrix <- function(
   if (res$solution[2] < res$solution[1]) {
     # second trait is the oldest one
     sc <- scenario(res$root, 2)
-  }
-
-  # if we have to calculate the root,
-  # we add a parameter.
-  if (root == "") {
-    k <- k + 1
   }
 
   obj <- list(
