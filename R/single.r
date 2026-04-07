@@ -167,11 +167,144 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
     " (leads to node ", b$node, ") time ", round(b$age, digits), "\n",
     sep = ""
   ))
+
+  if (is.infinite(x$logLik)) {
+    return()
+  }
+
   cat("Rates:\n")
   Q <- x$Q
   rownames(Q) <- states
   colnames(Q) <- states
   print(Q)
+}
+
+fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
+  if (!inherits(tree, "phylo")) {
+    stop("fit_fixed_births: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  mQ <- model$model
+  k <- max(mQ)
+
+  if (length(pi_x) == 0) {
+    pi_x <- default_pi_vector(model$states)
+  }
+
+  if (length(pi_x) != length(model$states)) {
+    stop("fit_fixed_births: invalid pi_x: size different to number of states")
+  }
+  if (sum(pi_x) != 0) {
+    pi_x <- pi_x / sum(pi_x)
+  }
+  pi_root <- rep(0, length(pi_x))
+
+  et <- encode_traits(t, data, 1)
+  cond <- set_conditionals(t, et, model)
+
+  max_rate <- maximum_transition_rate / max(t$ages)
+
+  if (length(birth) < 1) {
+    stop("fit_fixed_births: at least ine birth event is required")
+  }
+  birth <- birth[[1]]
+  if (is.null(birth$node)) {
+    stop(sprintf(
+      "fit_fixed_births: expecting field `node` in `birth` event"
+    ))
+  }
+  if (is.null(birth$age)) {
+    stop(sprintf(
+      "fit_fixed_births: expecting field `age` in `birth` event"
+    ))
+  }
+
+  # closure for the likelihood function
+  like_func <- function(yn, r) {
+    max_len <- t$age[yn]
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+      if (any(p > max_rate)) {
+        return(Inf)
+      }
+      Q <- from_model_to_Q(mQ, p)
+      lk <- sinba_single_like(
+        t, Q, model, birth, xt, cond,
+        r, pi_x, pi_root
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    opts <- def_nloptr_opts(k)
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  root_states <- c("0", "1")
+
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    youngest <- youngest_birth_event(t, et, root_states[r])
+    yn <- youngest[[1]]
+    if (!is_valid_birth(t, birth$node, yn)) {
+      next
+    }
+
+    fn <- like_func(yn, r)
+    par <- runif(max(mQ))
+    rr <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    if (rr$objective < res$objective) {
+      rr$root <- r
+      rr$yn <- yn
+      res <- rr
+    }
+  }
+
+  # if no birth is compatible with the birth event
+  # the likelihood is 0
+  if (is.infinite(res$objective)) {
+    obj <- list(
+      logLik = -Inf,
+      k = k,
+      model = model,
+      Q = matrix(nrow = 4, ncol = 4),
+      birth = birth,
+      root = "NA",
+      data = data,
+      tree = tree
+    )
+    class(obj) <- "fit_sinba_single"
+    return(obj)
+  }
+
+  q <- from_model_to_Q(mQ, res$solution)
+  q <- normalize_Q(q)
+  root_state <- root_states[res$root]
+
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    birth = birth,
+    root = root_state,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba_single"
+  return(obj)
 }
 
 #' @export
