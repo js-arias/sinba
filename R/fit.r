@@ -40,7 +40,6 @@ fit_sinba <- function(
     pi_x = NULL, pi_y = NULL,
     root = NULL,
     opts = NULL) {
-
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -208,7 +207,7 @@ fit_sinba <- function(
     Q = q,
     births = births,
     root = root_state,
-    scenario = sc,
+    scenarios = sc,
     data = data,
     tree = tree
   )
@@ -266,13 +265,21 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   cat("Birth events:\n")
   n <- colnames(x$data)
   b1 <- x$births[[1]]
-  cat(paste("- Trait ", n[2], " Node ",
-    b1$node, " time ", round(b1$age, digits), "\n",
+  e1 <- 0
+  if (b1$node > length(x$tree$tip.label) + 1) {
+    e1 <- which(x$tree$edge[, 2] == b1$node)
+  }
+  cat(paste("- Trait ", n[2], " Edge ", e1,
+    " (leads to node ", b1$node, ") time ", round(b1$age, digits), "\n",
     sep = ""
   ))
   b2 <- x$births[[2]]
-  cat(paste("- Trait ", n[3], " Node ",
-    b2$node, " time ", round(b2$age, digits), "\n",
+  e2 <- 0
+  if (b2$node > length(x$tree$tip.label) + 1) {
+    e2 <- which(x$tree$edge[, 2] == b2$node)
+  }
+  cat(paste("- Trait ", n[3], " Edge ", e2,
+    " (leads to node ", b2$node, ") time ", round(b2$age, digits), "\n",
     sep = ""
   ))
   cat("Rates:\n")
@@ -526,7 +533,7 @@ fit_fixed_births <- function(
     Q = q,
     births = births,
     root = root_state,
-    scenario = sc,
+    scenarios = sc,
     data = data,
     tree = tree
   )
@@ -711,7 +718,7 @@ fit_fixed_matrix <- function(
     Q = q,
     births = births,
     root = root_state,
-    scenario = sc,
+    scenarios = sc,
     data = data,
     tree = tree
   )
@@ -910,7 +917,7 @@ fixed_sinba <- function(
     Q = q,
     births = births,
     root = root_state,
-    scenario = sc,
+    scenarios = sc,
     data = data,
     tree = tree
   )

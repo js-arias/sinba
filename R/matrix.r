@@ -1245,7 +1245,7 @@ reduce_matrix <- function(m) {
   n <- colnames(m)
   states <- c()
   for (i in seq_len(length(n))) {
-    if (any(m[i, ] != 0)) {
+    if (any(m[i, ] != 0) || any(m[, i] != 0)) {
       states <- c(states, n[i])
     }
   }

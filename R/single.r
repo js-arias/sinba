@@ -158,7 +158,15 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
 
   cat("Birth event:\n")
   b <- x$birth
-  cat(paste("- Node ", b$node, " time ", round(b$age, digits), "\n", sep = ""))
+  ed <- 0
+  if (b$node > length(x$tree$tip.label) + 1) {
+    ed <- which(x$tree$edge[, 2] == b$node)
+  }
+
+  cat(paste("- Edge ", ed,
+    " (leads to node ", b$node, ") time ", round(b$age, digits), "\n",
+    sep = ""
+  ))
   cat("Rates:\n")
   Q <- x$Q
   rownames(Q) <- states
