@@ -663,6 +663,13 @@ fit_fixed_matrix <- function(
     pi_y <- pi_y / sum(pi_y)
   }
 
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
+
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
@@ -783,12 +790,13 @@ fit_fixed_matrix <- function(
 
 #' @export
 #' @title
-#' Estimate the Likelihood for a Given Sinba Transition Matrices in Two Traits
+#' Estimate the Likelihood for a Fixed Transition Matrix
+#' and Fixed Births
 #'
 #' @description
 #' `fixed_sinba()` calculates the likelihood
-#' for a given pair of transition matrices
-#' for two traits
+#' for a fixed transition matrix
+#' and fixed birth events
 #' under the Sinba model.
 #'
 #' @param tree A phylogenetic tree of class "phylo".
@@ -798,37 +806,49 @@ fit_fixed_matrix <- function(
 #'   coded as 0 and 1.
 #'   Any other column will be ignored.
 #' @param rate_mat Rate matrix for the traits with the full process.
-#' @param births A list with two element,
+#' @param births A list with one or two element,
 #'   each element being a list that define a birth event,
 #'   with a fields `node` indicating the birth of the trait
 #'   and `age` indicating the time from the start of the edge
 #'   in which the event happens.
+#'   If the model is for two traits,
+#'   and there is single defined birth,
+#'   the same birth will be used for both traits.
 #' @param model A model build with `new_model()`,
 #'   `new_hidden_model()`,
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
-#' @param ev_prob Set the probability of a birth event.
-#'   By default is 1
-#'   (i.e., we have observed different states in the traits).
-#' @param root Set the root state.
+#' @param pi_x The transition probability at the birth of x trait.
+#'   If NULL it will set 1.0 for the state 1.
+#' @param pi_y The transition probability at the birth of y trait.
+#'   If NULL it will set 1.0 for the state 1.
+#' @param root Root prior probabilities.
 #'   By default,
-#'   the root state will be optimized as a parameter.
+#'   it uses a FitzJohn prior.
 fixed_sinba <- function(
     tree, data, rate_mat, births,
     model = NULL,
-    ev_prob = 1,
-    root = "") {
+    pi_x = NULL, pi_y = NULL,
+    root = NULL) {
+  if (is.null(model)) {
+    model <- new_model("IND")
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop(
+      "fixed_sinba: `model` must be an object of class \"sinba_model\"."
+    )
+  }
+  if (model$traits == 1) {
+    return(fixed_sinba_single(
+      tree, data, rate_mat, births, model, pi_x
+    ))
+  }
+
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
   }
   t <- phylo_to_sinba(tree)
 
-  if (is.null(model)) {
-    model <- new_model("IND")
-  }
-  if (!inherits(model, "sinba_model")) {
-    stop("fixed_sinba: `model` must be an object of class \"sinba_model\".")
-  }
   if (is.null(rate_mat)) {
     stop("fixed_sinba: `rate_mat` must be a matrix")
   }
@@ -839,24 +859,43 @@ fixed_sinba <- function(
     stop("fixed_sinba: `rate_mat` must have the same size as the `model`")
   }
 
+  if (length(pi_x) == 0) {
+    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+  }
+  if (length(pi_y) == 0) {
+    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+  }
+
+  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
+    stop("fixed_sinba: invalid pi_x: size different to number of states")
+  }
+  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
+    stop("fixed_sinba: invalid pi_y: size different to number of states")
+  }
+  if (sum(pi_x) != 0) {
+    pi_x <- pi_x / sum(pi_x)
+  }
+  if (sum(pi_y) != 0) {
+    pi_y <- pi_y / sum(pi_y)
+  }
+
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
+
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
-  root_states <- c("00", "01", "10", "11")
-  if (root != "") {
-    if (!(root %in% root_states)) {
-      stop("fixed_sinba: invalid root state.")
-    }
-  }
-
-  ev_prob <- 2 * log(ev_prob)
-
-  if (is.null(births)) {
-    stop("fixed_sinba: undefined `births` events")
+  if (length(births) < 1) {
+    stop("fixed_sinba: at least ine birth event is required")
   }
   if (length(births) < 2) {
-    stop("fixed_sinba: two events required in `births`")
+    births[[2]] <- births[[1]]
   }
+
   for (i in 1:2) {
     e <- births[[i]]
     if (is.null(e$node)) {
@@ -871,7 +910,8 @@ fixed_sinba <- function(
     }
     if (e$age > t$br_len[e$node]) {
       stop(sprintf(
-        "fixed_sinba: invalid value for field `age` in `births` event %d", i
+        "fixed_sinba: invalid value for field `age` in `births` event %d",
+        i
       ))
     }
   }
@@ -886,7 +926,7 @@ fixed_sinba <- function(
         logLik = -Inf,
         k = 0,
         model = model,
-        Q = normalize_Q(rate_mat),
+        Q = matrix(nrow = 4, ncol = 4),
         births = births,
         root = "NA",
         data = data,
@@ -897,10 +937,19 @@ fixed_sinba <- function(
     }
   }
 
-  res <- list(objective = Inf)
+  root_states <- c("00", "01", "10", "11")
+
+  res <- list(objective = -Inf)
   for (r in sample(seq_len(length(root_states)))) {
-    if (root != "") {
-      if (root != root_states[r]) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
         next
       }
     }
@@ -912,12 +961,13 @@ fixed_sinba <- function(
     if (!is_valid_birth(t, births[[2]]$node, youngest[[2]])) {
       next
     }
+
     xt <- tree_to_cpp(t)
-    lk <- -sinba_like(
+    lk <- sinba_like(
       t, rate_mat, model, births, xt, cond,
-      r, ev_prob
+      r, pi_x, pi_y, root
     )
-    if (lk < res$objective) {
+    if (lk > res$objective) {
       res <- list(
         objective = lk,
         root = r
@@ -925,19 +975,12 @@ fixed_sinba <- function(
     }
   }
 
-  k <- 0
-  # if we have to calculate the root,
-  # we add a parameter.
-  if (root == "") {
-    k <- 1
-  }
-
   # if no birth sequence is compatible with birth events
   # the likelihood is 0
   if (is.infinite(res$objective)) {
     obj <- list(
       logLik = -Inf,
-      k = k,
+      k = 0,
       model = model,
       Q = normalize_Q(rate_mat),
       births = births,
@@ -966,7 +1009,7 @@ fixed_sinba <- function(
   }
 
   obj <- list(
-    logLik = -res$objective,
+    logLik = res$objective,
     k = 0,
     model = model,
     Q = q,
