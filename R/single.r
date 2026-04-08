@@ -1,6 +1,6 @@
 fit_sinba_single <- function(
     tree, data, model,
-    pi_x,
+    pi_x, root,
     opts) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
@@ -20,7 +20,13 @@ fit_sinba_single <- function(
   if (sum(pi_x) != 0) {
     pi_x <- pi_x / sum(pi_x)
   }
-  pi_root <- rep(0, length(pi_x))
+
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -53,7 +59,7 @@ fit_sinba_single <- function(
       Q <- from_model_to_Q(mQ, p[2:length(p)])
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
-        r, pi_x, pi_root
+        r, pi_x, root
       )
       return(-lk)
     })
@@ -70,6 +76,19 @@ fit_sinba_single <- function(
 
   res <- list(objective = Inf)
   for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
     youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     fn <- like_func(yn, r)
@@ -179,7 +198,10 @@ print.fit_sinba_single <- function(x, digits = 6, ...) {
   print(Q)
 }
 
-fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
+fit_sinba_single_fixed_birth <- function(
+    tree, data, birth, model,
+    pi_x, root,
+    opts) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_births: `tree` must be an object of class \"phylo\".")
   }
@@ -198,7 +220,13 @@ fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
   if (sum(pi_x) != 0) {
     pi_x <- pi_x / sum(pi_x)
   }
-  pi_root <- rep(0, length(pi_x))
+
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -235,7 +263,7 @@ fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
       Q <- from_model_to_Q(mQ, p)
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
-        r, pi_x, pi_root
+        r, pi_x, root
       )
       return(-lk)
     })
@@ -252,6 +280,19 @@ fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
 
   res <- list(objective = Inf)
   for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
     youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     if (!is_valid_birth(t, birth$node, yn)) {
@@ -309,7 +350,7 @@ fit_sinba_single_fixed_birth <- function(tree, data, birth, model, pi_x, opts) {
 
 fit_sinba_single_fixed_matrix <- function(
     tree, data, rate_mat, model,
-    pi_x, opts) {
+    pi_x, root, opts) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
   }
@@ -338,7 +379,13 @@ fit_sinba_single_fixed_matrix <- function(
   if (sum(pi_x) != 0) {
     pi_x <- pi_x / sum(pi_x)
   }
-  pi_root <- rep(0, length(pi_x))
+
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -366,7 +413,7 @@ fit_sinba_single_fixed_matrix <- function(
 
       lk <- sinba_single_like(
         t, rate_mat, model, birth, xt, cond,
-        r, pi_x, pi_root
+        r, pi_x, root
       )
       return(-lk)
     })
@@ -383,6 +430,19 @@ fit_sinba_single_fixed_matrix <- function(
 
   res <- list(objective = Inf)
   for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
     youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     fn <- like_func(yn, r)
@@ -423,7 +483,7 @@ fit_sinba_single_fixed_matrix <- function(
 
 fixed_sinba_single <- function(
     tree, data, rate_mat, birth,
-    model, pi_x) {
+    model, pi_x, root) {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -450,7 +510,13 @@ fixed_sinba_single <- function(
   if (sum(pi_x) != 0) {
     pi_x <- pi_x / sum(pi_x)
   }
-  pi_root <- rep(0, length(pi_x))
+
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -474,6 +540,19 @@ fixed_sinba_single <- function(
 
   res <- list(objective = -Inf)
   for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
     youngest <- youngest_birth_event(t, et, root_states[r])
     yn <- youngest[[1]]
     if (!is_valid_birth(t, birth$node, yn)) {
@@ -483,11 +562,8 @@ fixed_sinba_single <- function(
     xt <- tree_to_cpp(t)
     lk <- sinba_single_like(
       t, rate_mat, model, birth, xt, cond,
-      r, pi_x, pi_root
+      r, pi_x, root
     )
-    print(root_states[r])
-    print(lk)
-    print(res)
 
     if (lk > res$objective) {
       res <- list(
@@ -496,8 +572,6 @@ fixed_sinba_single <- function(
       )
     }
   }
-  print(rate_mat)
-  print(normalize_Q(rate_mat))
 
   # if no birth sequence is compatible with the birth event
   # the likelihood is 0

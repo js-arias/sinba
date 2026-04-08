@@ -47,7 +47,7 @@ fit_sinba <- function(
     stop("fit_sinba: `model` must be an object of class \"sinba_model\".")
   }
   if (model$traits == 1) {
-    return(fit_sinba_single(tree, data, model, pi_x, opts))
+    return(fit_sinba_single(tree, data, model, pi_x, root, opts))
   }
   mQ <- model$model
   k <- max(mQ) + 2
@@ -371,7 +371,9 @@ fit_fixed_births <- function(
     )
   }
   if (model$traits == 1) {
-    return(fit_sinba_single_fixed_birth(tree, data, births, model, pi_x, opts))
+    return(fit_sinba_single_fixed_birth(
+      tree, data, births, model, pi_x, root, opts
+    ))
   }
   mQ <- model$model
   k <- max(mQ)
@@ -622,7 +624,7 @@ fit_fixed_matrix <- function(
   }
   if (model$traits == 1) {
     return(fit_sinba_single_fixed_matrix(
-      tree, data, rate_mat, model, pi_x, opts
+      tree, data, rate_mat, model, pi_x, root, opts
     ))
   }
 
@@ -840,7 +842,7 @@ fixed_sinba <- function(
   }
   if (model$traits == 1) {
     return(fixed_sinba_single(
-      tree, data, rate_mat, births, model, pi_x
+      tree, data, rate_mat, births, model, pi_x, root
     ))
   }
 
