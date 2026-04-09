@@ -379,3 +379,68 @@ cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc,
 	}
 	return cond;
 }
+
+// sinba_simultaneous calculates the likelihood conditionals
+// using a vector anc with parent nodes,
+// vector desc with descendant nodes,
+// vector st with the activate status of the node,
+// vector lengths with the the branch lengths of each edge,
+// a matrix with the conditionals of the tips,
+// the ages (in a brach) of each event,
+// and the Q matrices.
+[[cpp11::register]]
+cpp11::doubles_matrix<> sinba_simultaneous(integers anc, integers desc,
+					   integers st,
+					   doubles lengths,
+					   writable::doubles_matrix<> cond,
+					   double birth_age,
+					   doubles_matrix<> Q,
+					   doubles root_pi,
+					   doubles_matrix<> root_PI_mat)
+{
+	// edges are sorted from the root
+	for (int i = desc.size() - 1; i >= 0; i--)
+	{
+		int n = desc[i];
+		int a = anc[n];
+
+		writable::doubles to(cond.ncol());
+		for (int j = 0; j < cond.ncol(); j++)
+		{
+			to[j] = cond(n, j);
+		}
+
+		doubles from;
+		switch (st[a])
+		{
+		case 0:
+			if (st[n] == 2)
+			{
+				// events in the same branch
+				// first we calculate the conditional for the birth of the full process.
+				double len = lengths[n] - birth_age;
+				doubles tmp2 = conditional(to, Q, len);
+
+				// update the conditionals with the event
+				tmp2 = birth_event(tmp2, root_PI_mat, root_pi);
+
+				// finally we calculate the conditional for the inactive process.
+				from = tmp2;
+				break;
+			}
+
+			// inactive process.
+			from = to;
+			break;
+		default:
+			// full process.
+			from = conditional(to, Q, lengths[n]);
+		}
+
+		for (int j = 0; j < cond.ncol(); j++)
+		{
+			cond(a, j) += from[j];
+		}
+	}
+	return cond;
+}

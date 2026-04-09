@@ -11,3 +11,7 @@ sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_a
 full_sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_age, root_Q, semi_Q, Q) {
   .Call(`_sinba_full_sinba_conditionals`, anc, desc, st, lengths, cond, first_age, second_age, root_Q, semi_Q, Q)
 }
+
+sinba_simultaneous <- function(anc, desc, st, lengths, cond, birth_age, Q, root_pi, root_PI_mat) {
+  .Call(`_sinba_sinba_simultaneous`, anc, desc, st, lengths, cond, birth_age, Q, root_pi, root_PI_mat)
+}

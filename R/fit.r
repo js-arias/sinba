@@ -321,6 +321,207 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 
 #' @export
 #' @title
+#' Maximum Likelihood Estimation With a Simultaneous Birth
+#'
+#' @description
+#' `fit_simultaneous()` searches for the maximum likelihood estimate
+#' with the Sinba model assuming that the birth of two traits
+#' is simultaneous.
+#' It estimate the values of the parameters for the Q matrix
+#' as well as the birth event.
+#'
+#' @param tree A phylogenetic tree of class "phylo".
+#' @param data A data frame with the data.
+#'   The first column should contain the taxon names,
+#'   The second and third column contains the data,
+#'   coded as 0 and 1.
+#'   Any other column will be ignored.
+#' @param model A model build with `new_model()`,
+#'   `new_hidden_model()`,
+#'   or `new_rates_model()`.
+#'   By default it uses the independent model.
+#' @param pi_xy The transition probability at the birth
+#'   of x and y traits.
+#'   If NULL it will set 1.0 for the state 11.
+#' @param root Root prior probabilities.
+#'   By default is uses FitzJohn prior.
+#' @param opts User defined parameters for the optimization
+#'   with the `nloptr` package.
+#'   By default it attempts a reasonable set of options.
+fit_simultaneous <- function(
+    tree, data, model = NULL,
+    pi_xy = NULL,
+    root = NULL,
+    opts = NULL) {
+  if (is.null(model)) {
+    model <- new_model("IND")
+  }
+  if (!inherits(model, "sinba_model")) {
+    stop(
+      "fit_simultaneous: `model` must be an object of class \"sinba_model\"."
+    )
+  }
+  if (model$traits != 2) {
+    stop("fit_simultaneous: `model` should be a two traits model")
+  }
+  mQ <- model$model
+  k <- max(mQ) + 1
+
+  if (!inherits(tree, "phylo")) {
+    stop("fit_simultaneous: `tree` must be an object of class \"phylo\".")
+  }
+  t <- phylo_to_sinba(tree)
+
+  if (length(pi_xy) == 0) {
+    pi_xy <- rep(0, length(model$states))
+    for (i in seq_len(length(model$states))) {
+      if (model$observed[[model$states[i]]] == "11") {
+        pi_xy[i] <- 1
+      }
+    }
+  }
+  if (length(pi_xy) != length(model$states)) {
+    stop("fit_simultaneous: invalid pi_xy: size different to number of states")
+  }
+  if (sum(pi_xy) != 0) {
+    pi_xy <- pi_xy / sum(pi_xy)
+  }
+
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
+    root <- root / sum(root)
+  }
+
+  et <- encode_traits(t, data, 2)
+  cond <- set_conditionals(t, et, model)
+
+  # simultaneous birth parameter
+  transition_start <- 2
+
+  max_rate <- maximum_transition_rate / max(t$ages)
+
+  # closure for the likelihood function
+  like_func <- function(yn, r) {
+    xt <- tree_to_cpp(t)
+
+    return(function(p) {
+      if (any(p < 0)) {
+        return(Inf)
+      }
+      if (any(p[transition_start:length(p)] > max_rate)) {
+        return(Inf)
+      }
+
+      births <- list()
+      for (i in 1:2) {
+        j <- 1
+        n <- get_node_by_len(t, p[j], yn[j])
+        if (n <= 0) {
+          return(Inf)
+        }
+        b <- list(
+          node = n,
+          age = t$br_len[n] + p[j] - t$age[n]
+        )
+        births[[i]] <- b
+      }
+
+      Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
+      lk <- sinba_like(
+        t, Q, model, births, xt, cond,
+        r, pi_xy, pi_xy, root, TRUE
+      )
+      return(-lk)
+    })
+  }
+
+  if (is.null(opts)) {
+    opts <- def_nloptr_opts(k)
+  }
+  if (is.null(opts$algorithm)) {
+    opts$algorithm <- "NLOPT_LN_SBPLX"
+  }
+
+  root_states <- c("00", "01", "10", "11")
+
+  res <- list(objective = Inf)
+  for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
+    youngest <- youngest_birth_event(t, et, root_states[r])
+    # check all possible birth events
+    ev <- birth_events(t, youngest)
+    for (i in sample(seq_len(length(ev)))) {
+      e <- min(ev[[i]])
+      fn <- like_func(e, r)
+      par <- c(runif(1, max = t$age[e]), runif(k - 1))
+      rr <- nloptr::nloptr(
+        x0 = par,
+        eval_f = fn,
+        opts = opts
+      )
+      if (rr$objective < res$objective) {
+        rr$root <- r
+        rr$ev_nodes <- e
+        res <- rr
+      }
+    }
+  }
+
+  q <- from_model_to_Q(mQ, res$solution[transition_start:length(res$solution)])
+  q <- normalize_Q(q)
+  births <- list()
+  for (i in 1:2) {
+    j <- 1
+    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
+    if (n <= 0) {
+      return(Inf)
+    }
+    b <- list(
+      node = n,
+      age = t$br_len[n] + res$solution[j] - t$age[n]
+    )
+    births[[i]] <- b
+  }
+  root_state <- root_states[res$root]
+
+  # retrieve the scenario
+  sc <- scenario(res$root, 1)
+  if (res$solution[2] < res$solution[1]) {
+    # second trait is the oldest one
+    sc <- scenario(res$root, 2)
+  }
+
+  obj <- list(
+    logLik = -res$objective,
+    k = k,
+    model = model,
+    Q = q,
+    births = births,
+    root = root_state,
+    scenarios = sc,
+    data = data,
+    tree = tree
+  )
+  class(obj) <- "fit_sinba"
+  return(obj)
+}
+
+#' @export
+#' @title
 #' Maximum Likelihood Estimation of a Transition Matrix With Fixed Births
 #'
 #' @description
@@ -1028,8 +1229,9 @@ fixed_sinba <- function(
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(
-    t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root) {
-  l <- sinba_cond(t, Q, model, births, xt, cond, root, pi_x, pi_y)
+    t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root,
+    simultaneous = FALSE) {
+  l <- sinba_cond(t, Q, model, births, xt, cond, root, pi_x, pi_y, simultaneous)
 
   return(add_root_prior(l[t$root_id, ], pi_root))
 }
@@ -1051,7 +1253,7 @@ add_root_prior <- function(likes, pi) {
 # sinba_cond return the conditional likelihoods
 # under the sinba model.
 sinba_cond <- function(
-    t, Q, model, births, xt, cond, root, pi_x, pi_y) {
+    t, Q, model, births, xt, cond, root, pi_x, pi_y, simultaneous) {
   Q <- normalize_Q(Q)
 
   root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
@@ -1131,6 +1333,20 @@ sinba_cond <- function(
   }
 
   st <- as.integer(active_status(t, ev$first$node, ev$second$node))
+
+  if (simultaneous) {
+    m_PI_root <- matrix(0, nrow = nrow(model$model), ncol = ncol(model$model))
+    m_PI_root[root, ] <- seq_len(length(pi_x))
+    l <- sinba_simultaneous(
+      xt$parent, xt$nodes, st, xt$branch,
+      cond,
+      ev$first$age,
+      ev$second$Q,
+      pi_x,
+      m_PI_root
+    )
+    return(l)
+  }
 
   l <- sinba_conditionals(
     xt$parent, xt$nodes, st, xt$branch,
