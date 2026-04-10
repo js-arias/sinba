@@ -9,8 +9,9 @@ fit_fixed_matrix(
   data,
   rate_mat,
   model = NULL,
-  ev_prob = 1,
-  root = "",
+  pi_x = NULL,
+  pi_y = NULL,
+  root = NULL,
   opts = NULL
 )
 }
@@ -30,13 +31,15 @@ Any other column will be ignored.}
 or \code{new_rates_model()}.
 By default it uses the independent model.}
 
-\item{ev_prob}{Set the probability of a birth event.
-By default is 1
-(i.e., we have observed different states in the traits).}
+\item{pi_x}{The transition probability at the birth of x trait.
+If NULL it will set 1.0 for the state 1.}
 
-\item{root}{Set the root state.
+\item{pi_y}{The transition probability at the birth of y trait.
+If NULL it will set 1.0 for the state 1.}
+
+\item{root}{Root prior probabilities.
 By default,
-the root state will be optimized as a parameter.}
+it uses a FitzJohn prior.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
@@ -44,7 +47,7 @@ By default it attempts a reasonable set of options.}
 }
 \description{
 \code{fit_fixed_matrix()} searches for the maximum likelihood estimate
-of birth events of two traits
+of birth events
 given a transition matrix
 under the Sinba model.
 }

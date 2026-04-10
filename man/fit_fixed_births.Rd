@@ -9,8 +9,9 @@ fit_fixed_births(
   data,
   births,
   model = NULL,
-  ev_prob = 1,
-  root = "",
+  pi_x = NULL,
+  pi_y = NULL,
+  root = NULL,
   opts = NULL
 )
 }
@@ -23,24 +24,29 @@ The second and third column contains the data,
 coded as 0 and 1.
 Any other column will be ignored.}
 
-\item{births}{A list with two element,
+\item{births}{A list with one or two element,
 each element being a list that define a birth event,
 with a fields \code{node} indicating the birth of the trait
 and \code{age} indicating the time from the start of the edge
-in which the event happens.}
+in which the event happens.
+If the model is for two traits,
+and there is single defined birth,
+the same birth will be used for both traits.}
 
 \item{model}{A model build with \code{new_model()},
 \code{new_hidden_model()},
 or \code{new_rates_model()}.
 By default it uses the independent model.}
 
-\item{ev_prob}{Set the probability of a birth event.
-By default is 1
-(i.e., we have observed different states in the traits).}
+\item{pi_x}{The transition probability at the birth of x trait.
+If NULL it will set 1.0 for the state 1.}
 
-\item{root}{Set the root state.
+\item{pi_y}{The transition probability at the birth of y trait.
+If NULL it will set 1.0 for the state 1.}
+
+\item{root}{Root prior probabilities.
 By default,
-the root state will be optimized as a parameter.}
+it uses a FitzJohn prior.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.

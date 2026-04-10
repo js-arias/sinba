@@ -15,7 +15,7 @@ test_that("fit_sinba works", {
   expect_no_error(fit_sinba(tree, data_xz, new_model("IND")))
 })
 
-test_that("fit_sinba works with single birth", {
+test_that("fit_sinba works with a simultaneous birth", {
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -23,13 +23,10 @@ test_that("fit_sinba works with single birth", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  expect_no_error(fit_sinba(tree, data_xz, new_model("IND"),
-    single_birth = TRUE
-  ))
+  expect_no_error(fit_simultaneous(tree, data_xz, new_model("IND")))
 })
 
 test_that("fit_sinba works with hidden model", {
-  skip_on_cran()
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -46,7 +43,7 @@ test_that("fit_sinba works with hidden model", {
     )
   )
 
-  expect_no_error(fit_sinba(tree, data_xz, hm))
+  expect_no_error(fit_sinba(tree, data_xz, model_as(hm, "IND")))
 })
 
 test_that("pagel works", {
@@ -61,7 +58,6 @@ test_that("pagel works", {
 })
 
 test_that("pagel works with hidden model", {
-  skip_on_cran()
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -79,7 +75,45 @@ test_that("pagel works with hidden model", {
     )
   )
 
-  expect_no_error(fit_pagel(tree, data_xz, hm))
+  expect_no_error(fit_pagel(tree, data_xz, model_as(hm, "IND")))
+})
+
+test_that("fit_mixed works", {
+  set.seed(6)
+
+  tree <- pbtree(n = 26, tip.label = LETTERS)
+  x <- c(0, 0, rep(1, 12), rep(0, 12))
+  z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
+  data_xz <- data.frame(LETTERS, x, z)
+
+  expect_no_error(fit_mixed(
+    tree, data_xz,
+    trait = "x"
+  ))
+})
+
+test_that("fit_fixed_births works", {
+  set.seed(6)
+
+  tree <- pbtree(n = 26, tip.label = LETTERS)
+  x <- c(0, 0, rep(1, 12), rep(0, 12))
+  z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
+  data_xz <- data.frame(LETTERS, x, z)
+
+  births <- list(
+    list(
+      node = 31,
+      age = 0
+    ),
+    list(
+      node = 28,
+      age = 0
+    )
+  )
+
+  expect_no_error(fit_fixed_births(
+    tree, data_xz, births
+  ))
 })
 
 test_that("fit_fixed_matrix works", {
@@ -90,16 +124,20 @@ test_that("fit_fixed_matrix works", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  fs <- fit_sinba(tree, data_xz, new_model("IND"))
+  q <- matrix(c(
+    0,    1e-6, 2, 0,
+    3,    0,    0, 2,
+    1e-6, 0,    0, 1e-6,
+    0,    1e-6, 3, 0
+  ), byrow = TRUE, nrow = 4)
 
   expect_no_error(fit_fixed_matrix(
-    tree, data_xz, fs$Q,
+    tree, data_xz, q,
     model = new_model("IND")
   ))
 })
 
 test_that("fit_fixed_matrix works with hidden model", {
-  skip_on_cran()
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -115,12 +153,20 @@ test_that("fit_fixed_matrix works with hidden model", {
       )
     )
   )
-
-  fs <- fit_sinba(tree, data_xz, hm)
+  hq <- matrix(c(
+    0,    3,    3,    0,   3,    0,   3,   0,
+    1e-6, 0,    0,    3,   0,    3,   0,   3,
+    0.01, 0,    0,    3,   0.5,  0,   0.5, 0,
+    0,    0.01, 1e-6, 0,   0,    0.5, 0,   0.5,
+    0.01, 0,    0.5,  0,   0,    3,   0.5, 0,
+    0,    0.01, 0,    0.5, 1e-6, 0,   0,   0.5,
+    0.01, 0,    0.5,  0,   0.5,  0,   0,   3,
+    0,    0.01, 0,    0.5, 0,    0.5, 0,   0
+  ), byrow = TRUE, nrow = 8)
 
   expect_no_error(fit_fixed_matrix(
-    tree, data_xz, fs$Q,
-    model = hm
+    tree, data_xz, hq,
+    model = model_as(hm, "IND")
   ))
 })
 
@@ -132,24 +178,30 @@ test_that("fixed_sinba works", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  fp <- fit_pagel(tree, data_xz, new_model("IND"))
-  root_id <- length(tree$tip.label) + 1
-  births <- list()
-  for (i in 1:2) {
-    b <- list(
-      node = root_id,
+  births <- list(
+    list(
+      node = 31,
+      age = 0
+    ),
+    list(
+      node = 28,
       age = 0
     )
-    births[[i]] <- b
-  }
+  )
+
+  q <- matrix(c(
+    0,    1e-6, 2, 0,
+    3,    0,    0, 2,
+    1e-6, 0,    0, 1e-6,
+    0,    1e-6, 3, 0
+  ), byrow = TRUE, nrow = 4)
 
   expect_no_error(fixed_sinba(
-    tree, data_xz, fp$Q, births
+    tree, data_xz, q, births
   ))
 })
 
 test_that("fixed_sinba works with hidden models", {
-  skip_on_cran()
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -166,35 +218,45 @@ test_that("fixed_sinba works with hidden models", {
     )
   )
 
-  fp <- fit_pagel(tree, data_xz, model = hm)
-  root_id <- length(tree$tip.label) + 1
-  births <- list()
-  for (i in 1:2) {
-    b <- list(
-      node = root_id,
+  hq <- matrix(c(
+    0,    3,    3,    0,   3,    0,   3,   0,
+    1e-6, 0,    0,    3,   0,    3,   0,   3,
+    0.01, 0,    0,    3,   0.5,  0,   0.5, 0,
+    0,    0.01, 1e-6, 0,   0,    0.5, 0,   0.5,
+    0.01, 0,    0.5,  0,   0,    3,   0.5, 0,
+    0,    0.01, 0,    0.5, 1e-6, 0,   0,   0.5,
+    0.01, 0,    0.5,  0,   0.5,  0,   0,   3,
+    0,    0.01, 0,    0.5, 0,    0.5, 0,   0
+  ), byrow = TRUE, nrow = 8)
+
+  births <- list(
+    list(
+      node = 31,
+      age = 0
+    ),
+    list(
+      node = 28,
       age = 0
     )
-    births[[i]] <- b
-  }
+  )
 
   expect_no_error(fixed_sinba(
-    tree, data_xz, fp$Q, births,
-    model = hm
+    tree, data_xz, hq, births,
+    model = model_as(hm, "IND")
   ))
 })
 
-test_that("fit_sinba_single works", {
+test_that("fit_sinba works on a single trait", {
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_z <- data.frame(LETTERS, z)
 
-  expect_no_error(fit_sinba_single(tree, data_z, model = new_model(traits = 1)))
+  expect_no_error(fit_sinba(tree, data_z, model = new_model(traits = 1)))
 })
 
 test_that("fit_sinba_single works with hidden model", {
-  skip_on_cran()
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -211,25 +273,34 @@ test_that("fit_sinba_single works with hidden model", {
     traits = 1
   )
 
-  expect_no_error(fit_sinba_single(tree, data_z, model = hm))
+  expect_no_error(fit_sinba(tree, data_z, model = hm))
 })
 
-test_that("fixed_sinba_single works", {
+test_that("fixed_sinba works on a single trait", {
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_z <- data.frame(LETTERS, z)
 
-  fz <- fit_sinba_single(tree, data_z)
+  birth <- list(
+    list(
+      node = 28,
+      age = 0
+    )
+  )
+  q <- matrix(c(
+    0, 1,
+    2, 0
+  ), byrow = TRUE, nrow = 2)
 
-  expect_no_error(fixed_sinba_single(
-    tree, data_z, fz$Q, fz$birth
+  expect_no_error(fixed_sinba(
+    tree, data_z, q, birth,
+    model = new_model(traits = 1)
   ))
 })
 
-test_that("fixed_sinba works with hidden models", {
-  skip_on_cran()
+test_that("fixed_sinba works a single trait and hidden models", {
   set.seed(6)
 
   tree <- pbtree(n = 26, tip.label = LETTERS)
@@ -245,10 +316,22 @@ test_that("fixed_sinba works with hidden models", {
     ),
     traits = 1
   )
+  hq <- matrix(c(
+    0,    1.7, 0.07, 13,
+    10,   0,   1.1,  1e-6,
+    0.03, 5,   0,    15,
+    25,   35,  10,   0
+  ), byrow = TRUE, nrow = 4)
 
-  fz <- fit_sinba_single(tree, data_z, model = hm)
-  expect_no_error(fixed_sinba_single(
-    tree, data_z, fz$Q, fz$birth,
+  birth <- list(
+    list(
+      node = 28,
+      age = 0
+    )
+  )
+
+  expect_no_error(fixed_sinba(
+    tree, data_z, hq, birth,
     model = hm
   ))
 })

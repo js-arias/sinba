@@ -63,7 +63,6 @@ fit_sinba <- function(
   if (length(pi_y) == 0) {
     pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
   }
-
   if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
     stop("fit_sinba: invalid pi_x: size different to number of states")
   }
@@ -107,14 +106,13 @@ fit_sinba <- function(
 
       births <- list()
       for (i in 1:2) {
-        j <- i
-        n <- get_node_by_len(t, p[j], yn[j])
+        n <- get_node_by_len(t, p[i], yn[i])
         if (n <= 0) {
           return(Inf)
         }
         b <- list(
           node = n,
-          age = t$br_len[n] + p[j] - t$age[n]
+          age = t$br_len[n] + p[i] - t$age[n]
         )
         births[[i]] <- b
       }
@@ -179,14 +177,13 @@ fit_sinba <- function(
   q <- normalize_Q(q)
   births <- list()
   for (i in 1:2) {
-    j <- i
-    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
+    n <- get_node_by_len(t, res$solution[i], res$ev_node[i])
     if (n <= 0) {
       return(Inf)
     }
     b <- list(
       node = n,
-      age = t$br_len[n] + res$solution[j] - t$age[n]
+      age = t$br_len[n] + res$solution[i] - t$age[n]
     )
     births[[i]] <- b
   }
@@ -243,6 +240,7 @@ logLik.fit_sinba <- function(object, ...) {
 #' @param ... Additional arguments are unused.
 print.fit_sinba <- function(x, digits = 6, ...) {
   cat("Sinba: Fit\n")
+  cat("Traits: ", x$model$traits, ".\n", sep = "")
 
   states <- x$model$states
   mm <- x$model$model
@@ -261,26 +259,39 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 
   cat("Root state: ", x$root, "\n", sep = "")
 
-  cat("Birth events:\n")
-  n <- colnames(x$data)
-  b1 <- x$births[[1]]
-  e1 <- 0
-  if (b1$node > length(x$tree$tip.label) + 1) {
-    e1 <- which(x$tree$edge[, 2] == b1$node)
+  if (x$model$traits == 1) {
+    b <- x$birth
+    ed <- 0
+    if (b$node > length(x$tree$tip.label) + 1) {
+      ed <- which(x$tree$edge[, 2] == b$node)
+    }
+
+    cat(paste("- Edge ", ed,
+      " (leads to node ", b$node, ") time ", round(b$age, digits), "\n",
+      sep = ""
+    ))
+  } else {
+    cat("Birth events:\n")
+    n <- colnames(x$data)
+    b1 <- x$births[[1]]
+    e1 <- 0
+    if (b1$node > length(x$tree$tip.label) + 1) {
+      e1 <- which(x$tree$edge[, 2] == b1$node)
+    }
+    cat(paste("- Trait ", n[2], " Edge ", e1,
+      " (leads to node ", b1$node, ") time ", round(b1$age, digits), "\n",
+      sep = ""
+    ))
+    b2 <- x$births[[2]]
+    e2 <- 0
+    if (b2$node > length(x$tree$tip.label) + 1) {
+      e2 <- which(x$tree$edge[, 2] == b2$node)
+    }
+    cat(paste("- Trait ", n[3], " Edge ", e2,
+      " (leads to node ", b2$node, ") time ", round(b2$age, digits), "\n",
+      sep = ""
+    ))
   }
-  cat(paste("- Trait ", n[2], " Edge ", e1,
-    " (leads to node ", b1$node, ") time ", round(b1$age, digits), "\n",
-    sep = ""
-  ))
-  b2 <- x$births[[2]]
-  e2 <- 0
-  if (b2$node > length(x$tree$tip.label) + 1) {
-    e2 <- which(x$tree$edge[, 2] == b2$node)
-  }
-  cat(paste("- Trait ", n[3], " Edge ", e2,
-    " (leads to node ", b2$node, ") time ", round(b2$age, digits), "\n",
-    sep = ""
-  ))
 
   if (is.infinite(x$logLik)) {
     return()
@@ -291,6 +302,10 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   rownames(Q) <- states
   colnames(Q) <- states
   print(Q)
+
+  if (x$model$traits == 1) {
+    return()
+  }
   age1 <- phylo_node_age(x$tree, b1$node)
   age2 <- phylo_node_age(x$tree, b2$node)
   if (b1$node == b2$node) {
@@ -416,14 +431,13 @@ fit_simultaneous <- function(
 
       births <- list()
       for (i in 1:2) {
-        j <- 1
-        n <- get_node_by_len(t, p[j], yn[j])
+        n <- get_node_by_len(t, p[1], yn[1])
         if (n <= 0) {
           return(Inf)
         }
         b <- list(
           node = n,
-          age = t$br_len[n] + p[j] - t$age[n]
+          age = t$br_len[n] + p[1] - t$age[n]
         )
         births[[i]] <- b
       }
@@ -485,25 +499,17 @@ fit_simultaneous <- function(
   q <- normalize_Q(q)
   births <- list()
   for (i in 1:2) {
-    j <- 1
-    n <- get_node_by_len(t, res$solution[j], res$ev_node[j])
+    n <- get_node_by_len(t, res$solution[1], res$ev_node[1])
     if (n <= 0) {
       return(Inf)
     }
     b <- list(
       node = n,
-      age = t$br_len[n] + res$solution[j] - t$age[n]
+      age = t$br_len[n] + res$solution[1] - t$age[n]
     )
     births[[i]] <- b
   }
   root_state <- root_states[res$root]
-
-  # retrieve the scenario
-  sc <- scenario(res$root, 1)
-  if (res$solution[2] < res$solution[1]) {
-    # second trait is the oldest one
-    sc <- scenario(res$root, 2)
-  }
 
   obj <- list(
     logLik = -res$objective,
@@ -512,7 +518,6 @@ fit_simultaneous <- function(
     Q = q,
     births = births,
     root = root_state,
-    scenarios = sc,
     data = data,
     tree = tree
   )
@@ -594,7 +599,6 @@ fit_mixed <- function(
   } else {
     stop("fit_mixed: unknown trait")
   }
-
   if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
     stop("fit_mixed: invalid pi_trait: size different to number of states")
   }
@@ -829,7 +833,6 @@ fit_fixed_births <- function(
   if (length(pi_y) == 0) {
     pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
   }
-
   if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
     stop("fit_fixed_births: invalid pi_x: size different to number of states")
   }
@@ -1091,7 +1094,6 @@ fit_fixed_matrix <- function(
   if (length(pi_y) == 0) {
     pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
   }
-
   if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
     stop("fit_fixed_matrix: invalid pi_x: size different to number of states")
   }
@@ -1307,7 +1309,6 @@ fixed_sinba <- function(
   if (length(pi_y) == 0) {
     pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
   }
-
   if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
     stop("fixed_sinba: invalid pi_x: size different to number of states")
   }
@@ -1495,8 +1496,6 @@ sinba_cond <- function(
     t, Q, model, births, xt, cond, root, pi_x, pi_y, simultaneous) {
   Q <- normalize_Q(Q)
 
-  root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
-
   root_vector <- rep(0, 4)
   root_vector[root] <- 1
   m_PI_semi <- matrix()
@@ -1595,13 +1594,6 @@ sinba_cond <- function(
     pi_semi, pi_root,
     m_PI_semi, m_PI_root
   )
-
-  # l <- full_sinba_conditionals(
-  #  xt$parent, xt$nodes, st, xt$branch,
-  #  cond,
-  #  ev$first$age, ev$second$age,
-  #  root_Q, ev$first$Q, ev$second$Q
-  # )
   return(l)
 }
 

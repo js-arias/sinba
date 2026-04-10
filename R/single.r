@@ -13,7 +13,6 @@ fit_sinba_single <- function(
   if (length(pi_x) == 0) {
     pi_x <- default_pi_vector(model$states)
   }
-
   if (length(pi_x) != length(model$states)) {
     stop("fit_sinba: invalid pi_x: size different to number of states")
   }
@@ -124,78 +123,8 @@ fit_sinba_single <- function(
     data = data,
     tree = tree
   )
-  class(obj) <- "fit_sinba_single"
+  class(obj) <- "fit_sinba"
   return(obj)
-}
-
-#' @export
-#' @title Extract Log-Likelihood From a "fit_sinba_single" Object
-#'
-#' @description
-#' This method implements the `logLik` method
-#' on a "fit_sinba_single" object.
-#'
-#' @param object An object of type "fit_sinba_single".
-#' @param ... Additional arguments are unused.
-logLik.fit_sinba_single <- function(object, ...) {
-  l <- object$logLik
-  attr(l, "df") <- object$k
-  attr(l, "nobs") <- length(object$tree$tip.label)
-  class(l) <- "logLik"
-  return(l)
-}
-
-
-#' @export
-#' @title Basic Print For a "fit_sinba_single" Object
-#'
-#' @description
-#' This method implements the `print` method
-#' on a `fit_sinba_single` object.
-#'
-#' @param x An object of type "fit_sinba_single".
-#' @param digits The number of digits for decimal output.
-#' @param ... Additional arguments are unused.
-print.fit_sinba_single <- function(x, digits = 6, ...) {
-  cat("Single Sinba: Fit\n")
-
-  states <- x$model$states
-  mm <- x$model$model
-  rownames(mm) <- states
-  colnames(mm) <- states
-  cat("Model:\n")
-  print(mm)
-  cat(paste("Free parameters = ", x$k, ".\n", sep = ""))
-
-  aic <- 2 * x$k - 2 * x$logLik
-  aicc <- aic + (2 * x$k * x$k + 2 * x$k) / (length(x$tree$tip.label) - x$k - 1)
-  fit <- c(x$logLik, aic, aicc)
-  names(fit) <- c("logLik", "AIC", "AICc")
-  print(fit)
-
-  cat("Root state: ", x$root, "\n", sep = "")
-
-  cat("Birth event:\n")
-  b <- x$birth
-  ed <- 0
-  if (b$node > length(x$tree$tip.label) + 1) {
-    ed <- which(x$tree$edge[, 2] == b$node)
-  }
-
-  cat(paste("- Edge ", ed,
-    " (leads to node ", b$node, ") time ", round(b$age, digits), "\n",
-    sep = ""
-  ))
-
-  if (is.infinite(x$logLik)) {
-    return()
-  }
-
-  cat("Rates:\n")
-  Q <- x$Q
-  rownames(Q) <- states
-  colnames(Q) <- states
-  print(Q)
 }
 
 fit_sinba_single_fixed_birth <- function(
@@ -213,7 +142,6 @@ fit_sinba_single_fixed_birth <- function(
   if (length(pi_x) == 0) {
     pi_x <- default_pi_vector(model$states)
   }
-
   if (length(pi_x) != length(model$states)) {
     stop("fit_fixed_births: invalid pi_x: size different to number of states")
   }
@@ -326,7 +254,7 @@ fit_sinba_single_fixed_birth <- function(
       data = data,
       tree = tree
     )
-    class(obj) <- "fit_sinba_single"
+    class(obj) <- "fit_sinba"
     return(obj)
   }
 
@@ -344,7 +272,7 @@ fit_sinba_single_fixed_birth <- function(
     data = data,
     tree = tree
   )
-  class(obj) <- "fit_sinba_single"
+  class(obj) <- "fit_sinba"
   return(obj)
 }
 
@@ -369,10 +297,10 @@ fit_sinba_single_fixed_matrix <- function(
       "fit_fixed_matrix: `rate_mat` must have the same size as the `model`"
     )
   }
+
   if (length(pi_x) == 0) {
     pi_x <- default_pi_vector(model$states)
   }
-
   if (length(pi_x) != length(model$states)) {
     stop("fit_fixed_matrix: invalid pi_x: size different to number of states")
   }
@@ -477,7 +405,7 @@ fit_sinba_single_fixed_matrix <- function(
     data = data,
     tree = tree
   )
-  class(obj) <- "fit_sinba_single"
+  class(obj) <- "fit_sinba"
   return(obj)
 }
 
@@ -586,7 +514,7 @@ fixed_sinba_single <- function(
       data = data,
       tree = tree
     )
-    class(obj) <- "fit_sinba_single"
+    class(obj) <- "fit_sinba"
     return(obj)
   }
 
@@ -601,7 +529,7 @@ fixed_sinba_single <- function(
     data = data,
     tree = tree
   )
-  class(obj) <- "fit_sinba_single"
+  class(obj) <- "fit_sinba"
   return(obj)
 }
 
@@ -620,7 +548,6 @@ sinba_single_cond <- function(
     xt, cond, root, pi_x) {
   # make sure the Q matrix is valid
   Q <- normalize_Q(Q)
-  root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
   m_PI_root <- build_pi_matrix(model, "x", state_vector(model, "x"))
 
   st <- as.integer(active_status(t, birth$node, length(t$parent) + 1))
@@ -633,13 +560,5 @@ sinba_single_cond <- function(
     pi_x, pi_x,
     m_PI_root, m_PI_root
   )
-
-  #  l <- full_sinba_conditionals(
-  #    xt$parent, xt$nodes, st, xt$branch,
-  #    cond,
-  #    birth$age, 0,
-  #    root_Q, Q, root_Q
-  #  )
-
   return(l)
 }
