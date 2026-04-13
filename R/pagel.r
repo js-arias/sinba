@@ -18,13 +18,9 @@
 #'   or `new_rates_model()`.
 #'   By default it uses the independent model.
 #' @param root_method Method for root calculation at the root.
-#'   By default it use "fitzjohn"
-#'   (FitzJohn et al., 2009) method,
-#'   in which ancestral states are weighted by its own likelihood.
-#'   If set as "prior" it will use a root prior.
 #' @param root Root prior probabilities.
-#'   By default,
-#'   all states will have the same probability.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -46,18 +42,15 @@ fit_pagel <- function(
   mQ <- model$model
   k <- max(mQ)
 
-  et <- encode_traits(t, data, 2)
-  cond <- set_conditionals(t, et, model)
-
-  if (root_method == "prior") {
-    if (is.null(root)) {
-      root <- rep(1, ncol(cond))
-    }
-    if (length(root) != ncol(cond)) {
-      stop("fit_pagel: invalid size for `root` vector.")
-    }
+  if ((is.null(root)) || (sum(root) == 0)) {
+    root <- rep(0, length(model$states))
+  }
+  if (sum(root) != 0) {
     root <- root / sum(root)
   }
+
+  et <- encode_traits(t, data, 2)
+  cond <- set_conditionals(t, et, model)
 
   # closure for the likelihood function
   like_func <- function() {
@@ -158,10 +151,9 @@ print.fit_mk <- function(x, digits = 6, ...) {
   colnames(Q) <- states
   print(Q)
 
-  if (is.null(x$root)) {
-    cat("Root method: fitzjohn\n")
+  if (sum(x$root) == 0) {
+    cat("Root method: FitzJohn et al. (2009)\n")
   } else {
-    cat("Root method: prior\n")
     cat("Root prior:\n")
     root <- x$root
     names(root) <- states
@@ -174,12 +166,5 @@ mk_like <- function(t, Q, xt, cond, root) {
   l <- full_conditionals(
     xt$parent, xt$nodes, xt$branch, cond, Q
   )
-  scaled <- exp(l[t$root_id, ] - max(l[t$root_id, ]))
-  if (!is.null(root)) {
-    like <- log(sum(root * scaled)) + max(l[t$root_id, ])
-    return(like)
-  }
-  fitz <- scaled / sum(scaled)
-  like <- log(sum(fitz * scaled)) + max(l[t$root_id, ])
-  return(like)
+  return(add_root_prior(l[t$root_id, ], root))
 }

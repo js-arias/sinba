@@ -30,8 +30,8 @@ maximum_transition_rate <- 1000
 #' @param pi_y The transition probability at the birth of y trait.
 #'   If NULL it will set 1.0 for the state 1.
 #' @param root Root prior probabilities.
-#'   By default,
-#'   it uses a FitzJohn prior.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -202,7 +202,7 @@ fit_sinba <- function(
     model = model,
     Q = q,
     births = births,
-    root = root_state,
+    root = root,
     scenarios = sc,
     data = data,
     tree = tree
@@ -257,8 +257,6 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   names(fit) <- c("logLik", "AIC", "AICc")
   print(fit)
 
-  cat("Root state: ", x$root, "\n", sep = "")
-
   if (x$model$traits == 1) {
     b <- x$birth
     ed <- 0
@@ -294,6 +292,14 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   }
 
   if (is.infinite(x$logLik)) {
+    if (sum(x$root) == 0) {
+      cat("Root method: FitzJohn et al. (2009)\n")
+    } else {
+      cat("Root prior:\n")
+      root <- x$root
+      names(root) <- states
+      print(root)
+    }
     return()
   }
 
@@ -304,6 +310,14 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   print(Q)
 
   if (x$model$traits == 1) {
+    if (sum(x$root) == 0) {
+      cat("Root method: FitzJohn et al. (2009)\n")
+    } else {
+      cat("Root prior:\n")
+      root <- x$root
+      names(root) <- states
+      print(root)
+    }
     return()
   }
   age1 <- phylo_node_age(x$tree, b1$node)
@@ -332,6 +346,14 @@ print.fit_sinba <- function(x, digits = 6, ...) {
       print(normalize_Q(sQ))
     }
   }
+  if (sum(x$root) == 0) {
+    cat("Root method: FitzJohn et al. (2009)\n")
+  } else {
+    cat("Root prior:\n")
+    root <- x$root
+    names(root) <- states
+    print(root)
+  }
 }
 
 #' @export
@@ -359,7 +381,9 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #'   of x and y traits.
 #'   If NULL it will set 1.0 for the state 11.
 #' @param root Root prior probabilities.
-#'   By default is uses FitzJohn prior.
+#' @param root Root prior probabilities.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -517,7 +541,7 @@ fit_simultaneous <- function(
     model = model,
     Q = q,
     births = births,
-    root = root_state,
+    root = root,
     data = data,
     tree = tree
   )
@@ -556,7 +580,8 @@ fit_simultaneous <- function(
 #' @param pi_trait The transition probability for the birth
 #'   of the free trait.
 #' @param root Root prior probabilities.
-#'   By default is uses FitzJohn prior.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -754,7 +779,7 @@ fit_mixed <- function(
     model = model,
     Q = q,
     births = births,
-    root = root_state,
+    root = root,
     scenarios = sc,
     data = data,
     tree = tree
@@ -796,8 +821,8 @@ fit_mixed <- function(
 #' @param pi_y The transition probability at the birth of y trait.
 #'   If NULL it will set 1.0 for the state 1.
 #' @param root Root prior probabilities.
-#'   By default,
-#'   it uses a FitzJohn prior.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -897,7 +922,7 @@ fit_fixed_births <- function(
         model = model,
         Q = matrix(nrow = 4, ncol = 4),
         births = births,
-        root = "NA",
+        root = root,
         data = data,
         tree = tree
       )
@@ -980,7 +1005,7 @@ fit_fixed_births <- function(
       model = model,
       Q = matrix(nrow = 4, ncol = 4),
       births = births,
-      root = "NA",
+      root = root,
       data = data,
       tree = tree
     )
@@ -1011,7 +1036,7 @@ fit_fixed_births <- function(
     model = model,
     Q = q,
     births = births,
-    root = root_state,
+    root = root,
     scenarios = sc,
     data = data,
     tree = tree
@@ -1046,8 +1071,9 @@ fit_fixed_births <- function(
 #' @param pi_y The transition probability at the birth of y trait.
 #'   If NULL it will set 1.0 for the state 1.
 #' @param root Root prior probabilities.
-#'   By default,
-#'   it uses a FitzJohn prior.
+#' @param root Root prior probabilities.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
@@ -1223,7 +1249,7 @@ fit_fixed_matrix <- function(
     model = model,
     Q = q,
     births = births,
-    root = root_state,
+    root = root,
     scenarios = sc,
     data = data,
     tree = tree
@@ -1267,8 +1293,9 @@ fit_fixed_matrix <- function(
 #' @param pi_y The transition probability at the birth of y trait.
 #'   If NULL it will set 1.0 for the state 1.
 #' @param root Root prior probabilities.
-#'   By default,
-#'   it uses a FitzJohn prior.
+#' @param root Root prior probabilities.
+#'   By default it use FitzJohn et al. (2009) method,
+#'   in which ancestral states are weighted by its own likelihood.
 fixed_sinba <- function(
     tree, data, rate_mat, births,
     model = NULL,
@@ -1371,7 +1398,7 @@ fixed_sinba <- function(
         model = model,
         Q = matrix(nrow = 4, ncol = 4),
         births = births,
-        root = "NA",
+        root = root,
         data = data,
         tree = tree
       )
@@ -1427,7 +1454,7 @@ fixed_sinba <- function(
       model = model,
       Q = normalize_Q(rate_mat),
       births = births,
-      root = "NA",
+      root = root,
       data = data,
       tree = tree
     )
@@ -1457,7 +1484,7 @@ fixed_sinba <- function(
     model = model,
     Q = q,
     births = births,
-    root = root_state,
+    root = root,
     scenarios = sc,
     data = data,
     tree = tree
