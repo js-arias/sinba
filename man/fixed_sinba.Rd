@@ -48,8 +48,8 @@ If NULL it will set 1.0 for the state 1.}
 If NULL it will set 1.0 for the state 1.}
 
 \item{root}{Root prior probabilities.
-By default,
-it uses a FitzJohn prior.}
+By default it use FitzJohn et al. (2009) method,
+in which ancestral states are weighted by its own likelihood.}
 }
 \description{
 \code{fixed_sinba()} calculates the likelihood

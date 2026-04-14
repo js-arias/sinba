@@ -38,7 +38,8 @@ Use "y" for the second trait.}
 of the free trait.}
 
 \item{root}{Root prior probabilities.
-By default is uses FitzJohn prior.}
+By default it use FitzJohn et al. (2009) method,
+in which ancestral states are weighted by its own likelihood.}
 
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
