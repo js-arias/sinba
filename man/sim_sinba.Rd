@@ -4,14 +4,20 @@
 \alias{sim_sinba}
 \title{Simulate A Pair of Traits Under the Sinba Model}
 \usage{
-sim_sinba(tree, rate_mat = NULL, semi_mat = NULL, births = NULL, scenario = "")
+sim_sinba(
+  tree,
+  rate_mat = NULL,
+  births = NULL,
+  model = NULL,
+  pi_x = NULL,
+  pi_y = NULL,
+  scenario = ""
+)
 }
 \arguments{
 \item{tree}{A phylogenetic tree of class "phylo".}
 
 \item{rate_mat}{Rate matrix for the traits with the full process.}
-
-\item{semi_mat}{Rate matrix for the traits with the semi-active process.}
 
 \item{births}{A list with the two birth events.
 Each element of the list must contain the field
@@ -27,6 +33,17 @@ must be an ancestor of other node.
 If it is NULL,
 a random pair of birth events will be selected.}
 
+\item{model}{A model build with \code{new_model()},
+\code{new_hidden_model()},
+or \code{new_rates_model()}.
+By default it uses the independent model.}
+
+\item{pi_x}{The transition probability at the birth of x trait.
+If NULL it will set 1.0 for the state 1.}
+
+\item{pi_y}{The transition probability at the birth of y trait.
+If NULL it will set 1.0 for the state 1.}
+
 \item{scenario}{A predefined scenario.
 Valid values are:
 "darwin": for the Darwin´s scenario.
@@ -38,8 +55,7 @@ Valid values are:
 A list with the tree,
 a data frame with the data,
 the births,
-and the Q and semi-active
-matrices used for the simulation.
+and the Q matrix used for the simulation.
 }
 \description{
 \code{sim_sinba} simulates a pair of traits
