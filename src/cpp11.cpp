@@ -13,33 +13,25 @@ extern "C" SEXP _sinba_full_conditionals(SEXP anc, SEXP desc, SEXP lengths, SEXP
   END_CPP11
 }
 // code.cpp
-cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double first_age, double second_age, doubles_matrix<> semi_Q, doubles_matrix<> Q, doubles semi_pi, doubles root_pi, doubles_matrix<> semi_PI_mat, doubles_matrix<> root_PI_mat);
-extern "C" SEXP _sinba_sinba_conditionals(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP first_age, SEXP second_age, SEXP semi_Q, SEXP Q, SEXP semi_pi, SEXP root_pi, SEXP semi_PI_mat, SEXP root_PI_mat) {
+cpp11::doubles_matrix<> sinba_conditionals(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double first_age, double second_age, doubles_matrix<> semi_Q, doubles_matrix<> Q, doubles act_pi, doubles semi_pi, doubles_matrix<> act_PI_mat, doubles_matrix<> semi_PI_mat);
+extern "C" SEXP _sinba_sinba_conditionals(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP first_age, SEXP second_age, SEXP semi_Q, SEXP Q, SEXP act_pi, SEXP semi_pi, SEXP act_PI_mat, SEXP semi_PI_mat) {
   BEGIN_CPP11
-    return cpp11::as_sexp(sinba_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(first_age), cpp11::as_cpp<cpp11::decay_t<double>>(second_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q), cpp11::as_cpp<cpp11::decay_t<doubles>>(semi_pi), cpp11::as_cpp<cpp11::decay_t<doubles>>(root_pi), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_PI_mat), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root_PI_mat)));
+    return cpp11::as_sexp(sinba_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(first_age), cpp11::as_cpp<cpp11::decay_t<double>>(second_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q), cpp11::as_cpp<cpp11::decay_t<doubles>>(act_pi), cpp11::as_cpp<cpp11::decay_t<doubles>>(semi_pi), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(act_PI_mat), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_PI_mat)));
   END_CPP11
 }
 // code.cpp
-cpp11::doubles_matrix<> full_sinba_conditionals(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double first_age, double second_age, doubles_matrix<> root_Q, doubles_matrix<> semi_Q, doubles_matrix<> Q);
-extern "C" SEXP _sinba_full_sinba_conditionals(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP first_age, SEXP second_age, SEXP root_Q, SEXP semi_Q, SEXP Q) {
+cpp11::doubles_matrix<> sinba_simultaneous(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double birth_age, doubles_matrix<> Q, doubles act_pi, doubles_matrix<> act_PI_mat);
+extern "C" SEXP _sinba_sinba_simultaneous(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP birth_age, SEXP Q, SEXP act_pi, SEXP act_PI_mat) {
   BEGIN_CPP11
-    return cpp11::as_sexp(full_sinba_conditionals(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(first_age), cpp11::as_cpp<cpp11::decay_t<double>>(second_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(semi_Q), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q)));
-  END_CPP11
-}
-// code.cpp
-cpp11::doubles_matrix<> sinba_simultaneous(integers anc, integers desc, integers st, doubles lengths, writable::doubles_matrix<> cond, double birth_age, doubles_matrix<> Q, doubles root_pi, doubles_matrix<> root_PI_mat);
-extern "C" SEXP _sinba_sinba_simultaneous(SEXP anc, SEXP desc, SEXP st, SEXP lengths, SEXP cond, SEXP birth_age, SEXP Q, SEXP root_pi, SEXP root_PI_mat) {
-  BEGIN_CPP11
-    return cpp11::as_sexp(sinba_simultaneous(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(birth_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q), cpp11::as_cpp<cpp11::decay_t<doubles>>(root_pi), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(root_PI_mat)));
+    return cpp11::as_sexp(sinba_simultaneous(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(birth_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q), cpp11::as_cpp<cpp11::decay_t<doubles>>(act_pi), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(act_PI_mat)));
   END_CPP11
 }
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
-    {"_sinba_full_conditionals",       (DL_FUNC) &_sinba_full_conditionals,        5},
-    {"_sinba_full_sinba_conditionals", (DL_FUNC) &_sinba_full_sinba_conditionals, 10},
-    {"_sinba_sinba_conditionals",      (DL_FUNC) &_sinba_sinba_conditionals,      13},
-    {"_sinba_sinba_simultaneous",      (DL_FUNC) &_sinba_sinba_simultaneous,       9},
+    {"_sinba_full_conditionals",  (DL_FUNC) &_sinba_full_conditionals,   5},
+    {"_sinba_sinba_conditionals", (DL_FUNC) &_sinba_sinba_conditionals, 13},
+    {"_sinba_sinba_simultaneous", (DL_FUNC) &_sinba_sinba_simultaneous,  9},
     {NULL, NULL, 0}
 };
 }

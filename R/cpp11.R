@@ -4,14 +4,10 @@ full_conditionals <- function(anc, desc, lengths, cond, Q) {
   .Call(`_sinba_full_conditionals`, anc, desc, lengths, cond, Q)
 }
 
-sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_age, semi_Q, Q, semi_pi, root_pi, semi_PI_mat, root_PI_mat) {
-  .Call(`_sinba_sinba_conditionals`, anc, desc, st, lengths, cond, first_age, second_age, semi_Q, Q, semi_pi, root_pi, semi_PI_mat, root_PI_mat)
+sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_age, semi_Q, Q, act_pi, semi_pi, act_PI_mat, semi_PI_mat) {
+  .Call(`_sinba_sinba_conditionals`, anc, desc, st, lengths, cond, first_age, second_age, semi_Q, Q, act_pi, semi_pi, act_PI_mat, semi_PI_mat)
 }
 
-full_sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_age, root_Q, semi_Q, Q) {
-  .Call(`_sinba_full_sinba_conditionals`, anc, desc, st, lengths, cond, first_age, second_age, root_Q, semi_Q, Q)
-}
-
-sinba_simultaneous <- function(anc, desc, st, lengths, cond, birth_age, Q, root_pi, root_PI_mat) {
-  .Call(`_sinba_sinba_simultaneous`, anc, desc, st, lengths, cond, birth_age, Q, root_pi, root_PI_mat)
+sinba_simultaneous <- function(anc, desc, st, lengths, cond, birth_age, Q, act_pi, act_PI_mat) {
+  .Call(`_sinba_sinba_simultaneous`, anc, desc, st, lengths, cond, birth_age, Q, act_pi, act_PI_mat)
 }

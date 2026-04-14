@@ -1293,7 +1293,6 @@ fit_fixed_matrix <- function(
 #' @param pi_y The transition probability at the birth of y trait.
 #'   If NULL it will set 1.0 for the state 1.
 #' @param root Root prior probabilities.
-#' @param root Root prior probabilities.
 #'   By default it use FitzJohn et al. (2009) method,
 #'   in which ancestral states are weighted by its own likelihood.
 fixed_sinba <- function(
@@ -1525,10 +1524,10 @@ sinba_cond <- function(
 
   root_vector <- rep(0, 4)
   root_vector[root] <- 1
+  m_PI_act <- matrix()
   m_PI_semi <- matrix()
-  m_PI_root <- matrix()
-  pi_semi <- pi_x
-  pi_root <- pi_y
+  pi_act <- pi_x
+  pi_semi <- pi_y
 
   b1 <- births[[1]]
   b2 <- births[[2]]
@@ -1565,10 +1564,10 @@ sinba_cond <- function(
       )
     )
     anc_vector <- active_ancestor_vector(sc)
-    m_PI_semi <- build_pi_matrix(model, "y", anc_vector)
-    m_PI_root <- build_pi_matrix(model, "x", root_vector)
-    pi_semi <- pi_y
-    pi_root <- pi_x
+    m_PI_act <- build_pi_matrix(model, "y", anc_vector)
+    m_PI_semi <- build_pi_matrix(model, "x", root_vector)
+    pi_act <- pi_y
+    pi_semi <- pi_x
   } else {
     # second trait is the oldest one
     sc <- scenario(root, 2)
@@ -1591,24 +1590,24 @@ sinba_cond <- function(
       )
     )
     anc_vector <- active_ancestor_vector(sc)
-    m_PI_semi <- build_pi_matrix(model, "x", anc_vector)
-    m_PI_root <- build_pi_matrix(model, "y", root_vector)
-    pi_semi <- pi_x
-    pi_root <- pi_y
+    m_PI_act <- build_pi_matrix(model, "x", anc_vector)
+    m_PI_semi <- build_pi_matrix(model, "y", root_vector)
+    pi_act <- pi_x
+    pi_semi <- pi_y
   }
 
   st <- as.integer(active_status(t, ev$first$node, ev$second$node))
 
   if (simultaneous) {
-    m_PI_root <- matrix(0, nrow = nrow(model$model), ncol = ncol(model$model))
-    m_PI_root[root, ] <- seq_len(length(pi_x))
+    m_PI_act <- matrix(0, nrow = nrow(model$model), ncol = ncol(model$model))
+    m_PI_act[root, ] <- seq_len(length(pi_x))
     l <- sinba_simultaneous(
       xt$parent, xt$nodes, st, xt$branch,
       cond,
       ev$first$age,
       ev$second$Q,
       pi_x,
-      m_PI_root
+      m_PI_act
     )
     return(l)
   }
@@ -1618,8 +1617,8 @@ sinba_cond <- function(
     cond,
     ev$first$age, ev$second$age,
     ev$first$Q, ev$second$Q,
-    pi_semi, pi_root,
-    m_PI_semi, m_PI_root
+    pi_act, pi_semi,
+    m_PI_act, m_PI_semi
   )
   return(l)
 }
