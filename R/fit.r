@@ -203,6 +203,8 @@ fit_sinba <- function(
     Q = q,
     births = births,
     root = root,
+    pi_x = pi_x,
+    pi_y = pi_y,
     scenarios = sc,
     data = data,
     tree = tree
@@ -542,6 +544,7 @@ fit_simultaneous <- function(
     Q = q,
     births = births,
     root = root,
+    pi_xy = pi_xy,
     data = data,
     tree = tree
   )
@@ -764,7 +767,6 @@ fit_mixed <- function(
     births[[1]] <- b_root
     births[[2]] <- b_trait
   }
-  root_state <- root_states[res$root]
 
   # retrieve the scenario
   sc <- scenario(res$root, 1)
@@ -780,6 +782,8 @@ fit_mixed <- function(
     Q = q,
     births = births,
     root = root,
+    pi_x = pi_x,
+    pi_y = pi_y,
     scenarios = sc,
     data = data,
     tree = tree
@@ -923,6 +927,8 @@ fit_fixed_births <- function(
         Q = matrix(nrow = 4, ncol = 4),
         births = births,
         root = root,
+        pi_x = pi_x,
+        pi_y = pi_y,
         data = data,
         tree = tree
       )
@@ -1006,6 +1012,8 @@ fit_fixed_births <- function(
       Q = matrix(nrow = 4, ncol = 4),
       births = births,
       root = root,
+      pi_x = pi_x,
+      pi_y = pi_y,
       data = data,
       tree = tree
     )
@@ -1037,6 +1045,8 @@ fit_fixed_births <- function(
     Q = q,
     births = births,
     root = root,
+    pi_x = pi_x,
+    pi_y = pi_y,
     scenarios = sc,
     data = data,
     tree = tree
@@ -1250,6 +1260,8 @@ fit_fixed_matrix <- function(
     Q = q,
     births = births,
     root = root,
+    pi_x = pi_x,
+    pi_y = pi_y,
     scenarios = sc,
     data = data,
     tree = tree
@@ -1398,6 +1410,8 @@ fixed_sinba <- function(
         Q = matrix(nrow = 4, ncol = 4),
         births = births,
         root = root,
+        pi_x = pi_x,
+        pi_y = pi_y,
         data = data,
         tree = tree
       )
@@ -1454,6 +1468,8 @@ fixed_sinba <- function(
       Q = normalize_Q(rate_mat),
       births = births,
       root = root,
+      pi_x = pi_x,
+      pi_y = pi_y,
       data = data,
       tree = tree
     )
@@ -1484,6 +1500,8 @@ fixed_sinba <- function(
     Q = q,
     births = births,
     root = root,
+    pi_x = pi_x,
+    pi_y = pi_y,
     scenarios = sc,
     data = data,
     tree = tree
@@ -1497,7 +1515,11 @@ fixed_sinba <- function(
 sinba_like <- function(
     t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root,
     simultaneous = FALSE) {
-  l <- sinba_cond(t, Q, model, births, xt, cond, root, pi_x, pi_y, simultaneous)
+  sc <- sinba_cond(
+    t, Q, model, births, xt, cond, root, pi_x, pi_y,
+    simultaneous
+  )
+  l <- sc$l
 
   return(add_root_prior(l[t$root_id, ], pi_root))
 }
@@ -1542,6 +1564,7 @@ sinba_cond <- function(
     a2 <- b2$age
   }
 
+  sc <- ""
   if (a1 < a2) {
     # first trait is the oldest one
     sc <- scenario(root, 1)
@@ -1609,7 +1632,12 @@ sinba_cond <- function(
       pi_x,
       m_PI_act
     )
-    return(l)
+    return(list(
+      st = st,
+      ev = ev,
+      m_PI_act = m_PI_act,
+      l = l
+    ))
   }
 
   l <- sinba_conditionals(
@@ -1620,7 +1648,14 @@ sinba_cond <- function(
     pi_act, pi_semi,
     m_PI_act, m_PI_semi
   )
-  return(l)
+  return(list(
+    st = st,
+    sc = sc,
+    ev = ev,
+    m_PI_semi = m_PI_semi,
+    m_PI_act = m_PI_act,
+    l = l
+  ))
 }
 
 # provide a default nloptr options

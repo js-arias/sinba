@@ -312,3 +312,16 @@ default_pi_vector <- function(states) {
   }
   return(pi)
 }
+
+set_pi_matrix <- function(m_PI, v_pi) {
+  m <- matrix(0, nrow = nrow(m_PI), ncol = ncol(m_PI))
+  for (i in seq_len(nrow(m))) {
+    for (j in seq_len(ncol(m))) {
+      if (m_PI[i, j] == 0) {
+        next
+      }
+      m[i, j] <- v_pi[m_PI[i, j]]
+    }
+  }
+  return(m)
+}

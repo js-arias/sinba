@@ -11,3 +11,7 @@ sinba_conditionals <- function(anc, desc, st, lengths, cond, first_age, second_a
 sinba_simultaneous <- function(anc, desc, st, lengths, cond, birth_age, Q, act_pi, act_PI_mat) {
   .Call(`_sinba_sinba_simultaneous`, anc, desc, st, lengths, cond, birth_age, Q, act_pi, act_PI_mat)
 }
+
+birth_conditional <- function(l, Q, obs, m_PI) {
+  .Call(`_sinba_birth_conditional`, l, Q, obs, m_PI)
+}

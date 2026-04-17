@@ -349,3 +349,35 @@ cpp11::doubles_matrix<> sinba_simultaneous(integers anc, integers desc,
 	}
 	return cond;
 }
+
+// birth_conditional calculates the normalized conditional likelihood
+// of a birth for a lineage of length l,
+// given a Q matrix
+// and obs states.
+[[cpp11::register]]
+cpp11::doubles_matrix<> birth_conditional(double l, doubles_matrix<> Q, doubles obs,
+					  doubles_matrix<> m_PI)
+{
+	if (l > 1e-6)
+	{
+		obs = conditional(obs, Q, l);
+	}
+	double mx = obs[0];
+	for (int i = 1; i < obs.size(); i++)
+	{
+		if (obs[i] > mx)
+		{
+			mx = obs[i];
+		}
+	}
+
+	writable::doubles_matrix<> from(obs.size(), obs.size());
+	for (int i = 0; i < from.nrow(); i++)
+	{
+		for (int j = 0; j < from.ncol(); j++)
+		{
+			from(i, j) = m_PI(i, j) * exp(obs[j] - mx);
+		}
+	}
+	return from;
+}

@@ -26,9 +26,17 @@ extern "C" SEXP _sinba_sinba_simultaneous(SEXP anc, SEXP desc, SEXP st, SEXP len
     return cpp11::as_sexp(sinba_simultaneous(cpp11::as_cpp<cpp11::decay_t<integers>>(anc), cpp11::as_cpp<cpp11::decay_t<integers>>(desc), cpp11::as_cpp<cpp11::decay_t<integers>>(st), cpp11::as_cpp<cpp11::decay_t<doubles>>(lengths), cpp11::as_cpp<cpp11::decay_t<writable::doubles_matrix<>>>(cond), cpp11::as_cpp<cpp11::decay_t<double>>(birth_age), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q), cpp11::as_cpp<cpp11::decay_t<doubles>>(act_pi), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(act_PI_mat)));
   END_CPP11
 }
+// code.cpp
+cpp11::doubles_matrix<> birth_conditional(double l, doubles_matrix<> Q, doubles obs, doubles_matrix<> m_PI);
+extern "C" SEXP _sinba_birth_conditional(SEXP l, SEXP Q, SEXP obs, SEXP m_PI) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(birth_conditional(cpp11::as_cpp<cpp11::decay_t<double>>(l), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(Q), cpp11::as_cpp<cpp11::decay_t<doubles>>(obs), cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(m_PI)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
+    {"_sinba_birth_conditional",  (DL_FUNC) &_sinba_birth_conditional,   4},
     {"_sinba_full_conditionals",  (DL_FUNC) &_sinba_full_conditionals,   5},
     {"_sinba_sinba_conditionals", (DL_FUNC) &_sinba_sinba_conditionals, 13},
     {"_sinba_sinba_simultaneous", (DL_FUNC) &_sinba_sinba_simultaneous,  9},

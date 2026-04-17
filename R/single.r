@@ -111,7 +111,6 @@ fit_sinba_single <- function(
     node = n,
     age = t$br_len[n] + res$solution[1] - t$age[n]
   )
-  root_state <- root_states[res$root]
 
   obj <- list(
     logLik = -res$objective,
@@ -119,7 +118,8 @@ fit_sinba_single <- function(
     model = model,
     Q = q,
     birth = birth,
-    root = root_state,
+    root = root,
+    pi_x = pi_x,
     data = data,
     tree = tree
   )
@@ -250,7 +250,8 @@ fit_sinba_single_fixed_birth <- function(
       model = model,
       Q = matrix(nrow = 4, ncol = 4),
       birth = birth,
-      root = "NA",
+      root = root,
+      pi_x = pi_x,
       data = data,
       tree = tree
     )
@@ -260,7 +261,6 @@ fit_sinba_single_fixed_birth <- function(
 
   q <- from_model_to_Q(mQ, res$solution)
   q <- normalize_Q(q)
-  root_state <- root_states[res$root]
 
   obj <- list(
     logLik = -res$objective,
@@ -268,7 +268,8 @@ fit_sinba_single_fixed_birth <- function(
     model = model,
     Q = q,
     birth = birth,
-    root = root_state,
+    root = root,
+    pi_x = pi_x,
     data = data,
     tree = tree
   )
@@ -393,7 +394,6 @@ fit_sinba_single_fixed_matrix <- function(
     node = n,
     age = t$br_len[n] + res$solution[1] - t$age[n]
   )
-  root_state <- root_states[res$root]
 
   obj <- list(
     logLik = -res$objective,
@@ -401,7 +401,8 @@ fit_sinba_single_fixed_matrix <- function(
     model = model,
     Q = q,
     birth = birth,
-    root = root_state,
+    root = root,
+    pi_x = pi_x,
     data = data,
     tree = tree
   )
@@ -510,7 +511,8 @@ fixed_sinba_single <- function(
       model = model,
       Q = normalize_Q(rate_mat),
       birth = birth,
-      root = "NA",
+      root = root,
+      pi_x = pi_x,
       data = data,
       tree = tree
     )
@@ -518,14 +520,14 @@ fixed_sinba_single <- function(
     return(obj)
   }
 
-  root_state <- root_states[res$root]
   obj <- list(
     logLik = res$objective,
     k = 0,
     model = model,
     Q = normalize_Q(rate_mat),
     birth = birth,
-    root = root_state,
+    root = root,
+    pi_x = pi_x,
     data = data,
     tree = tree
   )

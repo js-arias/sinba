@@ -6,51 +6,13 @@
 #'
 #' @description
 #' `map_sinba()` build one or more stochastic mappings
-#' using a reconstruction from the Sinba model
-#' or by reading a tree,
-#' a data set,
-#' and a model,
-#' and fitting the model on the tree
-#' for each stochastic map.
+#' using a reconstruction from the Sinba model.
 #'
 #' @param fitted An object of the type 'fit_sinba'
 #'   (i.e., a reconstruction using the Sinba model).
 #' @param n Number of stochastic maps.
 #'   Default is 100.
-#' @param tree A phylogenetic tree of class "phylo".
-#' @param data A data frame with the data.
-#'   The first column should contain the taxon names,
-#'   The second and third column contains the data,
-#'   coded as 0 and 1.
-#'   Any other column will be ignored.
-#' @param model A model build with `new_model()`,
-#'   `new_hidden_model()`,
-#'   or `new_rates_model()`.
-#'   By default it uses the independent model.
-#' @param opts User defined parameters for the optimization
-#'   with the `nloptr` package.
-#'   By default it attempts a reasonable set of options.
-map_sinba <- function(
-    fitted = NULL, n = 100,
-    tree = NULL, data = NULL, model = NULL, opts = NULL) {
-  if (!is.null(fitted)) {
-    return(map_sinba_fitted(fitted, n))
-  }
-  if (is.null(tree) || is.null(data)) {
-    stop("map_sinba: undefined data")
-  }
-
-  maps <- list()
-  for (i in seq_len(n)) {
-    f <- fit_sinba(tree, data, model = model, opts = opts)
-    sm <- map_sinba_fitted(f, n = 1)
-    maps[[i]] <- sm[[1]]
-  }
-  class(maps) <- c("multiSimmap", "multiPhylo")
-  return(maps)
-}
-
-map_sinba_fitted <- function(fitted, n) {
+map_sinba <- function(fitted, n = 100) {
   if (!inherits(fitted, "fit_sinba")) {
     stop("map_sinba: `fitted` must be an object of class \"fit_sinba\".")
   }
@@ -58,120 +20,127 @@ map_sinba_fitted <- function(fitted, n) {
     stop("map_sinba: impossible reconstruction (logLik == -Inf).")
   }
 
+  model <- fitted$model
   t <- phylo_to_sinba(fitted$tree)
+  Q <- fitted$Q
+  sc <- fitted$sc
+  pi_x <- fitted$pi_x
+  pi_y <- fitted$pi_y
   et <- encode_traits(t, fitted$data, 2)
   cond <- set_conditionals(t, et, fitted$model)
-  b1 <- fitted$births[[1]]
-  b2 <- fitted$births[[2]]
+  births <- fitted$births
 
-  root <- fitted$root
-  root_id <- 0
+  m_PI_act <- matrix()
+  m_PI_semi <- matrix()
+
   root_states <- c("00", "01", "10", "11")
-  for (i in seq_len(length(root_states))) {
-    if (root_states[i] == root) {
-      root_id <- i
+  root <- fitted$root
+  for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
     }
-  }
-  Q <- fitted$Q
-  model <- fitted$model
 
-  xt <- tree_to_cpp(t)
-  root_Q <- matrix(0, nrow = nrow(Q), ncol = ncol(Q))
+    youngest <- youngest_birth_event(t, et, root_states[r])
+    if (!is_valid_birth(t, births[[1]]$node, youngest[[1]])) {
+      next
+    }
+    if (!is_valid_birth(t, births[[2]]$node, youngest[[2]])) {
+      next
+    }
 
-  ev <- list()
-  n1 <- b1$node
-  n2 <- b2$node
-  a1 <- t$ages[n1]
-  a2 <- t$ages[n2]
-  if (n1 == n2) {
-    a1 <- b1$age
-    a2 <- b2$age
-  }
+    root_vector <- rep(0, 4)
+    root_vector[r] <- 1
+    if ((sc == "12") || (sc == "34")) {
+      anc_vector <- active_ancestor_vector(sc)
+      m_PI_act <- set_pi_matrix(build_pi_matrix(model, "x", anc_vector), pi_x)
+      m_PI_semi <- set_pi_matrix(build_pi_matrix(model, "y", root_vector), pi_y)
+    } else {
+      anc_vector <- active_ancestor_vector(sc)
+      m_PI_act <- set_pi_matrix(build_pi_matrix(model, "y", anc_vector), pi_y)
+      m_PI_semi <- set_pi_matrix(build_pi_matrix(model, "x", root_vector), pi_x)
+    }
 
-  if (a1 < a2) {
-    # first trait is the oldest one
-    sc <- scenario(root_id, 1)
-    semi <- build_semi_active_Q(model, sc, Q)
-    semi <- normalize_Q(semi)
-    ev <- list(
-      first = list(
-        # birth of trait 1
-        node = n1,
-        age = b1$age,
-        trait = 1,
-        Q = semi
-      ),
-      second = list(
-        # birth of trait 2
-        node = n2,
-        age = b2$age,
-        trait = 2,
-        Q = Q
+    xt <- tree_to_cpp(t)
+    sc <- sinba_cond(t, Q, model, births, xt, cond, r, pi_x, pi_y, FALSE)
+
+    s_names <- fitted$model$states
+    edges <- paste(fitted$tree$edge[, 1], ",", fitted$tree$edge[, 2], sep = "")
+    l <- sc$l
+    st <- sc$st
+    ev <- sc$ev
+    if (ev$second$n == t$root_id) {
+      mx <- max(l[t$root_id, ])
+      ev$second$cond <- exp(l[t$root_id, ] - mx)
+    } else {
+      br_len <- xt$branch[n] - ev$second$age
+      ev$second$cond <- birth_conditional(
+        br_len, ev$second$Q, l[ev$second$n, ],
+        m_PI_act
       )
-    )
-  } else {
-    # second trait is the oldest one
-    sc <- scenario(root_id, 2)
-    semi <- build_semi_active_Q(model, sc, Q)
-    semi <- normalize_Q(semi)
-    ev <- list(
-      first = list(
-        # birth of trait 2
-        node = n2,
-        age = b2$age,
-        trait = 2,
-        Q = semi
-      ),
-      second = list(
-        # birth of trait 1
-        node = n1,
-        age = b1$age,
-        trait = 1,
-        Q = Q
+    }
+    if (ev$first$n == t$root_id) {
+      mx <- max(l[t$t_root_id, ])
+      ev$first$cond <- exp(l[t$root_id, ] - mx)
+    } else {
+      br_len <- xt$branch[n] - ev$first$age
+      nc <- l[ev$first$n, ]
+      if (ev$first$n == ev$second$n) {
+        br_len <- ev$second$age - ev$first$age
+        mc <- ev$second$cond
+        nc <- c()
+        for (i in seq_len(nrow(mc))) {
+          nc <- c(nc, sum(mc[i, ]))
+        }
+        nc <- log(nc)
+      }
+      ev$first$cond <- birth_conditional(
+        br_len, ev$first$Q, nc,
+        m_PI_semi
       )
-    )
+    }
+
+    maps <- list()
+    for (i in seq_len(n)) {
+      sm <- evolve_map_sinba(
+        t, l, ev$first$cond, ev$second$cond, st,
+        ev$first$age, ev$second$age,
+        ev$first$Q, ev$second$Q,
+        ev$first$cond, ev$second$cond,
+        model, fitted$root
+      )
+      mtree <- fitted$tree
+      mtree$maps <- sm$maps
+      mtree$mapped.edge <- sm$edges
+      rownames(mtree$mapped.edge) <- edges
+      colnames(mtree$mapped.edge) <- s_names
+      class(mtree) <- c("simmap", "phylo")
+      attr(mtree, "map.order") <- "right-to-left"
+      maps[[i]] <- mtree
+    }
+    class(maps) <- c("multiSimmap", "multiPhylo")
+    return(maps)
   }
-
-  st <- as.integer(active_status(t, ev$first$node, ev$second$node))
-
-  l <- full_sinba_conditionals(
-    xt$parent, xt$nodes, st, xt$branch,
-    cond,
-    ev$first$age, ev$second$age,
-    root_Q, ev$first$Q, ev$second$Q
-  )
-
-  s_names <- fitted$model$states
-  edges <- paste(fitted$tree$edge[, 1], ",", fitted$tree$edge[, 2], sep = "")
-
-  maps <- list()
-  for (i in seq_len(n)) {
-    sm <- evolve_map_states(
-      t, l, st,
-      ev$first$age, ev$second$age,
-      root_Q, ev$first$Q, ev$second$Q,
-      model, fitted$root
-    )
-    mtree <- fitted$tree
-    mtree$maps <- sm$maps
-    mtree$mapped.edge <- sm$edges
-    rownames(mtree$mapped.edge) <- edges
-    colnames(mtree$mapped.edge) <- s_names
-    class(mtree) <- c("simmap", "phylo")
-    attr(mtree, "map.order") <- "right-to-left"
-    maps[[i]] <- mtree
-  }
-  class(maps) <- c("multiSimmap", "multiPhylo")
-  return(maps)
 }
 
-evolve_map_states <- function(
-    t, cond, st,
+evolve_map_sinba <- function(
+    t, cond, cond_b1, cond_b2,
+    st,
     age_1, age_2,
-    root_Q, first_Q, second_Q,
+    first_Q, second_Q,
+    semi_P, act_P,
     model, root) {
-  root_state <- pick_root_state(model, root, cond[t$root, ])
-  states <- rep(0, length(t$parent))
+  root_Q <- matrix(0, nrow = nrow(first_Q), ncol = ncol(first_Q))
+  root_state <- pick_root_state(root, cond[t$root, ])
+  states <- rep(root_state, length(t$parent))
   states[t$root] <- root_state
   sm <- list()
   edges <- matrix(0, nrow = length(t$edge), ncol = ncol(root_Q))
@@ -181,21 +150,24 @@ evolve_map_states <- function(
     s <- states[p]
     if (st[n] != st[p]) {
       Qs <- list()
+      Ps <- list()
       lens <- c()
       stages <- 1
       if (st[p] == 0) {
         Qs[[stages]] <- root_Q
         lens <- c(age_1)
         stages <- 2
+        Ps[[stages]] <- semi_P
       }
       Qs[[stages]] <- first_Q
       if (st[n] == 2) {
         lens <- c(lens, age_2)
         stages <- stages + 1
         Qs[[stages]] <- second_Q
+        Ps[[stages]] <- act_P
       }
       lens <- c(lens, t$br_len[n])
-      h <- pick_history_with_births(Qs, lens, s, cond[n, ], model$states)
+      h <- pick_history_with_births(Qs, Ps, lens, s, cond[n, ], model$states)
       states[n] <- h$end
       sm[[e]] <- h$evs
       edges[e, ] <- h$cm
@@ -219,32 +191,9 @@ evolve_map_states <- function(
   ))
 }
 
-pick_root_state <- function(model, root, end) {
-  # remove non root states
-  for (i in seq_len(length(end))) {
-    s <- model$states[i]
-    if (model$observed[[s]] != root) {
-      end[i] <- -Inf
-    }
-  }
-
-  end <- exp(end - max(end))
-  end <- end / sum(end)
-  # apply FitzJohn prior
-  end <- end * end
-  end <- end / max(end)
-
-  while (TRUE) {
-    s <- sample(seq_len(length(end)), 1)
-    if (runif(1) < end[s]) {
-      return(s)
-    }
-  }
-}
-
 pick_history <- function(Q, len, s, end, s_names) {
   end <- exp(end - max(end))
-  end <- end / sum(end)
+  end <- end / max(end)
   while (TRUE) {
     h <- store_evolution(Q, len, s, s_names)
     if (runif(1) < end[h$end]) {
@@ -253,11 +202,11 @@ pick_history <- function(Q, len, s, end, s_names) {
   }
 }
 
-pick_history_with_births <- function(Qs, lens, s, end, s_names) {
+pick_history_with_births <- function(Qs, Ps, lens, s, end, s_names) {
   end <- exp(end - max(end))
-  end <- end / sum(end)
+  end <- end / max(end)
   while (TRUE) {
-    h <- store_evolution_with_births(Qs, lens, s, s_names)
+    h <- store_evolution_with_births(Qs, Ps, lens, s, s_names)
     if (runif(1) < end[h$end]) {
       return(h)
     }
@@ -295,7 +244,7 @@ store_evolution <- function(Q, len, s, s_names) {
   ))
 }
 
-store_evolution_with_births <- function(Qs, lens, s, s_names) {
+store_evolution_with_births <- function(Qs, Ps, lens, s, s_names) {
   t <- 0
   evs <- c()
   times <- c()
@@ -308,7 +257,17 @@ store_evolution_with_births <- function(Qs, lens, s, s_names) {
     Q <- Qs[[stage]]
     t <- len
     len <- lens[stage]
+
+    # birth event
+    nx <- pick_birth_state(Ps[[stage]], s)
+    if (nx != s) {
+      # trait change at the birth event
+      times <- c(times, t)
+      evs <- c(evs, s)
+      s <- nx
+    }
   }
+
   while (TRUE) {
     dt <- len - t
     if (Q[s, s] != 0) {
@@ -318,9 +277,17 @@ store_evolution_with_births <- function(Qs, lens, s, s_names) {
       if (stage == length(lens)) {
         break
       }
+      # birth event
       stage <- stage + 1
       Q <- Qs[[stage]]
       t <- len
+      nx <- pick_birth_state(Ps[[stage]], s)
+      if (nx != s) {
+        # trait change at the birth event
+        times <- c(times, t)
+        evs <- c(evs, s)
+        s <- nx
+      }
       len <- lens[stage]
       next
     }
@@ -364,52 +331,31 @@ pick_next_state <- function(Q, s) {
   }
 }
 
+pick_birth_state <- function(P, s) {
+  mx <- max(P[s, ])
+  while (TRUE) {
+    nx <- sample(seq_len(nrow(P)), size = 1)
+    if (runif(1) < P[s, nx] / mx) {
+      return(nx)
+    }
+  }
+}
+
 #' @export
 #' @title
 #' Stochastic Map For the Pagel´s Model
 #'
 #' @description
 #' `map_pagel()` build one or more stochastic mappings
-#' using a reconstruction from the Pagel's model
-#' or by reading a tree,
-#' a data set,
-#' and a model,
-#' and fitting the model on the tree
-#' for each stochastic map.
+#' using a reconstruction from the Pagel's model.
 #'
-#' @param fitted An object of the type 'fit_sinba'
-#'   (i.e., a reconstruction using the Sinba model).
+#' @param fitted An object of the type 'fit_mk'
+#'   (i.e., a reconstruction produced with `fit_pagel()` function).
 #' @param n Number of stochastic maps.
 #'   Default is 100.
-#' @param tree A phylogenetic tree of class "phylo".
-#' @param data A data frame with the data.
-#'   The first column should contain the taxon names,
-#'   The second and third column contains the data,
-#'   coded as 0 and 1.
-#'   Any other column will be ignored.
-#' @param model A model build with `new_model()`,
-#'   `new_hidden_model()`,
-#'   or `new_rates_model()`.
-#'   By default it uses the independent model.
-#' @param opts User defined parameters for the optimization
-#'   with the `nloptr` package.
-#'   By default it attempts a reasonable set of options.
-map_pagel <- function(
-    fitted = NULL, n = 100,
-    tree = NULL, data = NULL, model = NULL, opts = NULL) {
-  if (!is.null(fitted)) {
-    return(map_pagel_fitted(fitted, n))
-  }
-  if (is.null(tree) || is.null(data)) {
-    stop("map_pagel: undefined data")
-  }
-  f <- fit_pagel(tree, data, model = model, opts = opts)
-  return(map_pagel_fitted(f, n))
-}
-
-map_pagel_fitted <- function(fitted, n) {
+map_pagel <- function(fitted, n = 100) {
   if (!inherits(fitted, "fit_mk")) {
-    stop("map_pagel: `fitted` must be an object of class \"fit_sinba\".")
+    stop("map_pagel: `fitted` must be an object of class \"fit_mk\".")
   }
 
   t <- phylo_to_sinba(fitted$tree)
@@ -444,7 +390,7 @@ map_pagel_fitted <- function(fitted, n) {
 }
 
 evolve_map_mk <- function(t, cond, Q, model, root) {
-  root_state <- pick_mk_root(root, cond[t$root, ])
+  root_state <- pick_root_state(root, cond[t$root, ])
   states <- rep(0, length(t$parent))
   states[t$root] <- root_state
   sm <- list()
@@ -464,10 +410,10 @@ evolve_map_mk <- function(t, cond, Q, model, root) {
   ))
 }
 
-pick_mk_root <- function(root, end) {
+pick_root_state <- function(root, end) {
   end <- exp(end - max(end))
   end <- end / sum(end)
-  if (is.null(root)) {
+  if (sum(root) == 0) {
     # apply FitzJohn prior
     end <- end * end
   } else {
