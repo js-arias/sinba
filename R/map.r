@@ -19,6 +19,9 @@ map_sinba <- function(fitted, n = 100) {
   if (is.infinite(fitted$logLik)) {
     stop("map_sinba: impossible reconstruction (logLik == -Inf).")
   }
+  if (!is.null(fitted$pi_xy)) {
+    return(map_sinba_simultaneous(fitted, n))
+  }
 
   model <- fitted$model
   t <- phylo_to_sinba(fitted$tree)
@@ -131,6 +134,85 @@ map_sinba <- function(fitted, n = 100) {
   }
 }
 
+map_sinba_simultaneous <- function(fitted, n) {
+  model <- fitted$model
+  t <- phylo_to_sinba(fitted$tree)
+  Q <- fitted$Q
+  pi_xy <- fitted$pi_xy
+  et <- encode_traits(t, fitted$data, 2)
+  cond <- set_conditionals(t, et, fitted$model)
+  births <- fitted$births
+
+  root_states <- c("00", "01", "10", "11")
+  root <- fitted$root
+  for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
+    youngest <- youngest_birth_event(t, et, root_states[r])
+    if (!is_valid_birth(t, births[[1]]$node, youngest[[1]])) {
+      next
+    }
+    if (!is_valid_birth(t, births[[1]]$node, youngest[[2]])) {
+      next
+    }
+
+    m_PI_act <- matrix(0, nrow = nrow(model$model), ncol = ncol(model$model))
+    m_PI_act[r, ] <- seq_len(length(pi_xy))
+    m_PI_act <- set_pi_matrix(m_PI_act, pi_xy)
+
+    xt <- tree_to_cpp(t)
+    sc <- sinba_cond(t, Q, model, births, xt, cond, r, pi_xy, pi_xy, TRUE)
+
+    s_names <- fitted$model$states
+    edges <- paste(fitted$tree$edge[, 1], ",", fitted$tree$edge[, 2], sep = "")
+    l <- sc$l
+    st <- sc$st
+    ev <- sc$ev
+    if (ev$first$n == t$root_id) {
+      mx <- max(l[t$root_id, ])
+      ev$first$cond <- exp(l[t$root_id, ] - mx)
+    } else {
+      br_len <- xt$branch[n] - ev$first$age
+      ev$first$cond <- birth_conditional(
+        br_len, Q, l[ev$first$n, ],
+        m_PI_act
+      )
+    }
+
+    maps <- list()
+    for (i in seq_len(n)) {
+      sm <- evolve_map_sinba_simultaneous(
+        t, l, ev$first$cond, st,
+        ev$first$age,
+        Q,
+        ev$first$cond,
+        model, fitted$root
+      )
+      mtree <- fitted$tree
+      mtree$maps <- sm$maps
+      mtree$mapped.edge <- sm$edges
+      rownames(mtree$mapped.edge) <- edges
+      colnames(mtree$mapped.edge) <- s_names
+      class(mtree) <- c("simmap", "phylo")
+      attr(mtree, "map.order") <- "right-to-left"
+      maps[[i]] <- mtree
+    }
+    class(maps) <- c("multiSimmap", "multiPhylo")
+    return(maps)
+  }
+}
+
 evolve_map_sinba <- function(
     t, cond, cond_b1, cond_b2,
     st,
@@ -179,6 +261,55 @@ evolve_map_sinba <- function(
     }
     if (st[n] == 1) {
       Q <- first_Q
+    }
+    h <- pick_history(Q, t$br_len[n], s, cond[n, ], model$states)
+    states[n] <- h$end
+    sm[[e]] <- h$evs
+    edges[e, ] <- h$cm
+  }
+  return(list(
+    maps = sm,
+    edges = edges
+  ))
+}
+
+evolve_map_sinba_simultaneous <- function(
+    t, cond, cond_b1,
+    st,
+    age_1,
+    second_Q,
+    act_P,
+    model, root) {
+  root_Q <- matrix(0, nrow = nrow(second_Q), ncol = ncol(second_Q))
+  root_state <- pick_root_state(root, cond[t$root, ])
+  states <- rep(root_state, length(t$parent))
+  states[t$root] <- root_state
+  sm <- list()
+  edges <- matrix(0, nrow = length(t$edge), ncol = ncol(root_Q))
+  for (e in seq_len(length(t$edge))) {
+    n <- t$edge[e]
+    p <- t$parent[n]
+    s <- states[p]
+    if (st[n] != st[p]) {
+      Qs <- list()
+      Ps <- list()
+      lens <- c()
+      stages <- 1
+      Qs[[stages]] <- root_Q
+      lens <- c(age_1)
+      stages <- 2
+      Ps[[stages]] <- act_P
+      Qs[[stages]] <- second_Q
+      lens <- c(lens, t$br_len[n])
+      h <- pick_history_with_births(Qs, Ps, lens, s, cond[n, ], model$states)
+      states[n] <- h$end
+      sm[[e]] <- h$evs
+      edges[e, ] <- h$cm
+      next
+    }
+    Q <- root_Q
+    if (st[n] == 2) {
+      Q <- second_Q
     }
     h <- pick_history(Q, t$br_len[n], s, cond[n, ], model$states)
     states[n] <- h$end
