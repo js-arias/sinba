@@ -24,6 +24,10 @@ map_sinba <- function(fitted, n = 100) {
   }
 
   model <- fitted$model
+  if (model$traits == 1) {
+    return(map_sinba_single(fitted, n))
+  }
+
   t <- phylo_to_sinba(fitted$tree)
   Q <- fitted$Q
   sc <- fitted$sc
@@ -179,6 +183,88 @@ map_sinba_simultaneous <- function(fitted, n) {
     l <- sc$l
     st <- sc$st
     ev <- sc$ev
+    if (ev$first$n == t$root_id) {
+      mx <- max(l[t$root_id, ])
+      ev$first$cond <- exp(l[t$root_id, ] - mx)
+    } else {
+      br_len <- xt$branch[n] - ev$first$age
+      ev$first$cond <- birth_conditional(
+        br_len, Q, l[ev$first$n, ],
+        m_PI_act
+      )
+    }
+
+    maps <- list()
+    for (i in seq_len(n)) {
+      sm <- evolve_map_sinba_simultaneous(
+        t, l, ev$first$cond, st,
+        ev$first$age,
+        Q,
+        m_PI_act,
+        model, fitted$root
+      )
+      mtree <- fitted$tree
+      mtree$maps <- sm$maps
+      mtree$mapped.edge <- sm$edges
+      rownames(mtree$mapped.edge) <- edges
+      colnames(mtree$mapped.edge) <- s_names
+      class(mtree) <- c("simmap", "phylo")
+      attr(mtree, "map.order") <- "right-to-left"
+      maps[[i]] <- mtree
+    }
+    class(maps) <- c("multiSimmap", "multiPhylo")
+    return(maps)
+  }
+}
+
+map_sinba_single <- function(fitted, n) {
+  model <- fitted$model
+  t <- phylo_to_sinba(fitted$tree)
+  Q <- fitted$Q
+  pi_x <- fitted$pi_x
+  et <- encode_traits(t, fitted$data, 1)
+  cond <- set_conditionals(t, et, fitted$model)
+  birth <- fitted$birth
+
+  root_states <- c("0", "1")
+  root <- fitted$root
+  for (r in sample(seq_len(length(root_states)))) {
+    if (sum(root) != 0) {
+      is_valid_root <- FALSE
+      for (i in seq_len(length(model$states))) {
+        obs <- model$observed[[model$states[i]]]
+        if ((obs == root_states[r]) && (root[r] > 0)) {
+          is_valid_root <- TRUE
+        }
+      }
+      if (!is_valid_root) {
+        next
+      }
+    }
+
+    youngest <- youngest_birth_event(t, et, root_states[r])
+    yn <- youngest[[1]]
+    if (!is_valid_birth(t, birth$node, yn)) {
+      next
+    }
+
+    m_PI_act <- build_pi_matrix(model, "x", state_vector(model, "x"))
+    m_PI_act <- set_pi_matrix(m_PI_act, pi_x)
+
+    xt <- tree_to_cpp(t)
+    l <- sinba_single_cond(t, Q, model, birth, xt, cond, r, pi_x)
+
+    s_names <- fitted$model$states
+    edges <- paste(fitted$tree$edge[, 1], ",", fitted$tree$edge[, 2], sep = "")
+    st <- active_status(t, birth$node, length(t$parent) + 1) * 2
+    ev <- list(
+      first = list(
+        node = birth$node,
+        age = birth$age,
+        trait = 1,
+        Q = Q
+      )
+    )
     if (ev$first$n == t$root_id) {
       mx <- max(l[t$root_id, ])
       ev$first$cond <- exp(l[t$root_id, ] - mx)
