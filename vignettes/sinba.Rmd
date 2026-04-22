@@ -23,10 +23,62 @@ The Sinba model is used to test the correlation
 between two traits using a phylogenetic comparative method framework
 originally developed by Pagel (1994).
 
+# Correlated trait evolution
+
+One of the main questions in evolutionary biology
+is if two traits evolve independently
+or in a correlated fashion.
+For example,
+suppose that we know the phylogenetic relationships of a clade,
+and we observe four traits on the clade members,
+*m*, *n*, *p*, and *q*:
+
+```{r}
+# Based on an example in section 7.2.2
+# from the book of Revell & Harmon (2022)
+# pp. 173-177.
+library(phytools)
+library(RColorBrewer)
+
+# seed to make the example reproducible
+set.seed(6)
+
+tree <- pbtree(n = 26, tip.label = LETTERS)
+m <- c(
+  0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1,
+  1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0
+)
+n <- m
+p <- c(
+  0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+  1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0
+)
+q <- rep(c(1, 0), 13)
+
+plotTree.datamatrix(tree,
+  data.frame(
+    m = as.factor(setNames(m, LETTERS)),
+    n = as.factor(setNames(n, LETTERS)),
+    p = as.factor(setNames(p, LETTERS)),
+    q = as.factor(setNames(q, LETTERS)),
+    row.names = LETTERS
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("YlOrBr", "Blues", "Greens", "Purples")
+)
+```
+
+It looks like *m* and *n* are correlated
+(they have the same distribution),
+*m* and *p* seem to be correlated
+(*p* has only 1 if *m* is 1),
+whereas *m* and *q* seem to be independent.
+
 # Pagel's method
 
-When traits are independent,
-each trait can be represented by a **Q matrix**
+To represent the evolution of a trait in a phylogenetic tree,
+we use a Markov model.
+This model is formalized by a **Q matrix**
 that contains the instantaneous transition rates between each state.
 For example,
 in a binary trait the Q matrix is:
@@ -45,15 +97,36 @@ and the model Q matrix.
 If you got two *independent* traits,
 then the full likelihood is the multiplication of the likelihood of both traits.
 
+```{r}
+# we do the fit of a single trait using PhyTools
+
+fit_m <- fitMk(tree, as.factor(setNames(m, LETTERS)),
+  model = "ARD", pi = "fitzjohn"
+)
+fit_n <- fitMk(tree, as.factor(setNames(n, LETTERS)),
+  model = "ARD", pi = "fitzjohn"
+)
+fit_p <- fitMk(tree, as.factor(setNames(p, LETTERS)),
+  model = "ARD", pi = "fitzjohn"
+)
+fit_q <- fitMk(tree, as.factor(setNames(q, LETTERS)),
+  model = "ARD", pi = "fitzjohn"
+)
+fit_m$logLik
+fit_n$logLik
+fit_p$logLik
+fit_q$logLik
+```
+
 But what happens if both traits are correlated?
 In such a case,
 the transformation between two states in a trait
 is different given the state of the second trait.
-So you can create a Q matrix
-with transformations between both traits.
-Pagel put a constraint in that matrix:
-only a single transformation is allowed at a time instant.
-So the Q matrix for both traits is:
+Pagel (1994) solved that problem
+by creating a Q matrix that combines the two traits.
+The constraint of this new matrix
+is that only a single transformation is allowed at a single time.
+Then the Q matrix for both traits is:
 
 $$
 Q=\begin{bmatrix}
@@ -78,6 +151,93 @@ using,
 for example, the Akaike information criterion
 (AIC, Akaike, 1974).
 
+In the `sinba` package,
+the Pagel model is run with the function `fit_pagel()`,
+and the models,
+either independent evolution or correlated evolution,
+are defined with the "IND" (the default) and "CORR" models:
+
+```{r}
+# in sinba the data is a data frame
+# in which the first column contains the name of the taxa
+# and other remaining columns the data.
+data_mn <- data.frame(taxa = LETTERS, m = m, n = n)
+data_mp <- data.frame(taxa = LETTERS, m = m, p = p)
+data_mq <- data.frame(taxa = LETTERS, m = m, q = q)
+
+# --- m vs n
+pagel_mn_ind <- fit_pagel(tree, data_mn)
+
+# compare the likelihood of both traits calculated independently
+# (calculated with PhyTools)
+# with the likelihood from the independent Pagel's model
+# (calculated in sinba package)
+fit_m$logLik + fit_n$logLik
+pagel_mn_ind$logLik
+
+# compare the independent and correlated model
+# using AIC
+pagel_mn_corr <- fit_pagel(tree, data_mn, model = new_model("CORR"))
+aic_mn <- setNames(
+  c(
+    AIC(pagel_mn_ind),
+    AIC(pagel_mn_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR")
+)
+aic_mn
+
+# --- m vs p
+pagel_mp_ind <- fit_pagel(tree, data_mp)
+
+# compare the likelihood of both traits calculated independently
+# (calculated with PhyTools)
+# with the likelihood from the independent Pagel's model
+# (calculated in sinba package)
+fit_m$logLik + fit_p$logLik
+pagel_mp_ind$logLik
+
+# compare the independent and correlated model
+# using AIC
+pagel_mp_corr <- fit_pagel(tree, data_mp, model = new_model("CORR"))
+aic_mp <- setNames(
+  c(
+    AIC(pagel_mp_ind),
+    AIC(pagel_mp_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR")
+)
+aic_mp
+
+# --- m vs q
+pagel_mq_ind <- fit_pagel(tree, data_mq)
+
+# compare the likelihood of both traits calculated independently
+# (calculated with PhyTools)
+# with the likelihood from the independent Pagel's model
+# (calculated in sinba package)
+fit_m$logLik + fit_q$logLik
+pagel_mq_ind$logLik
+
+# compare the independent and correlated model
+# using AIC
+pagel_mq_corr <- fit_pagel(tree, data_mq, model = new_model("CORR"))
+aic_mq <- setNames(
+  c(
+    AIC(pagel_mq_ind),
+    AIC(pagel_mq_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR")
+)
+aic_mq
+```
+
+As we suspected,
+*m* and *n*,
+and *m* and *p*,
+evolve in a correlated fashion,
+whereas *m* and *q* evolve independently.
+
 # Darwin's dilemma
 
 While the logic of Pagel's method is straightforward,
@@ -86,26 +246,12 @@ found that in some cases,
 in particular,
 when one of the traits has a single origin,
 the results of Pagel's method are misleading.
-They labeled their scenarios as *Darwin's dilemma*
-(a single change in both traits in the same branch)
-and the *unreplicated burst*
-(a single change of a trait,
-and the other trait changes its evolution speed).
-In those cases,
-the Pagel's method prefers trait correlation,
-when an independent model should be preferred.
 
 ```{r}
 # An example from the book of Revell & Harmon (2022)
 # section 7.2.2,
 # pp. 173-177.
-library(phytools)
-library(RColorBrewer)
 
-# seed to make the example reproducible
-set.seed(6)
-
-tree <- pbtree(n = 26, tip.label = LETTERS)
 x <- c(0, 0, rep(1, 12), rep(0, 12))
 y <- x
 z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
@@ -120,7 +266,25 @@ plotTree.datamatrix(tree,
   fsize = 1, space = 0.2, xexp = 1.4,
   palettes = c("YlOrBr", "Greens", "Purples")
 )
+```
 
+In this example,
+*x* and *y* have identical distributions,
+but in contrast with *m* and *n*,
+they only have a single origin.
+This scenario is known as "*Darwin's dilemma*."
+In the case of *z*,
+it seems that its evolutionary rate sped up in the same clade
+in which *x* originated.
+This scenario is known as the "*unreplicated burst*."
+
+The expectation is that in both scenarios,
+the preferred model should be the independent model,
+as we do not have enough evidence
+to suggest a trait correlation
+beyond that they happen to originate in the same clade.
+
+```{r}
 # Darwin's dilemma
 data_xy <- data.frame(LETTERS, x, y)
 
@@ -151,6 +315,10 @@ aic_xz <- setNames(
 aic_xz
 ```
 
+But contrary to our expectations,
+in both scenarios,
+the preferred model is the correlated model.
+
 # The Sinba model
 
 The main problem with Darwin's dilemma
@@ -178,19 +346,29 @@ so the process is a full process,
 or *active*.
 
 Apart from the parameters of the Q matrix,
-the Sinba model has three additional parameters:
-the location of each birth event
-and the state of the root.
+the Sinba model has two additional parameters:
+the location of each birth event.
+It also requires the starting state after each birth event
+(by default,
+the value is set as 1.0 for the trait labeled as 1).
 
-Now we can compare the AIC values
-of the traditional models from Pagel's method
-and the models from Sinba:
+In the `sinba package` the function to fit a pair of traits
+to the sinba model is called `fit_sinba()`.
+By default,
+it uses the independent model,
+but as for the Pagel's model,
+we can define a correlated model as well:
 
 ```{r}
-# Sinba model with the Darwin scenario
-sinba_xy_ind <- fit_sinba(tree, data_xy, model = new_model("IND"))
+# --- x and y (Darwin's scenario)
+
+# Sinba model for the Darwin's scenario with independent evolution
+sinba_xy_ind <- fit_sinba(tree, data_xy)
+# Sinba model for the Darwin's scenario with correlated evolution
 sinba_xy_corr <- fit_sinba(tree, data_xy, model = new_model("CORR"))
 
+# compare AIC values from Pagel's models
+# and Sinba models
 aic_xy <- setNames(
   c(
     AIC(pagel_xy_ind),
@@ -202,10 +380,15 @@ aic_xy <- setNames(
 )
 aic_xy
 
-# Sinba model with unreplicated burst scenario
+# --- x and z (unreplicated burst scenario)
+
+# Sinba model for the  unreplicated burst scenario with independent evolution
 sinba_xz_ind <- fit_sinba(tree, data_xz, model = new_model("IND"))
+# Sinba model for the  unreplicated burst scenario with independent evolution
 sinba_xz_corr <- fit_sinba(tree, data_xz, model = new_model("CORR"))
 
+# compare AIC values from Pagel's models
+# and Sinba models
 aic_xz <- setNames(
   c(
     AIC(pagel_xz_ind),
@@ -217,6 +400,13 @@ aic_xz <- setNames(
 )
 aic_xz
 ```
+
+For both scenarios,
+the sinba model with independent evolution
+has the best fit
+among the examined alternatives
+(Pagel and Sinba models
+with independent and correlated evolution).
 
 # Cited literature
 
@@ -247,3 +437,9 @@ Detecting correlated evolution on phylogenies: a general method for the comparat
 *Proceedings of the Royal Society of London. Series B: Biological Sciences*,
 **255**, 37-45.
 DOI: [10.1098/rspb.1994.0006](https://doi.org/10.1098/rspb.1994.0006).
+
+Revell, L. J., & Harmon, L. J.
+(2022).
+*Phylogenetic Comparative Methods in R*,
+Princeton Univ.,
+Princeton (U.S.A.).
