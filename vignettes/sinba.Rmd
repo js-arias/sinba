@@ -18,8 +18,8 @@ knitr::opts_chunk$set(
 library(sinba)
 ```
 
-The package sinba implements the **Sinba** (single birth of a trait) model.
-The Sinba model is used to test the correlation
+The package `sinba` implements the **sinba** (single birth of a trait) model.
+The sinba model is used to test the correlation
 between two traits using a phylogenetic comparative method framework
 originally developed by Pagel (1994).
 
@@ -30,8 +30,9 @@ is if two traits evolve independently
 or in a correlated fashion.
 For example,
 suppose that we know the phylogenetic relationships of a clade,
-and we observe four traits on the clade members,
-*m*, *n*, *p*, and *q*:
+and we observe four traits,
+*m*, *n*, *p*, and *q*,
+on the members of our clade:
 
 ```{r}
 # Based on an example in section 7.2.2
@@ -319,7 +320,7 @@ But contrary to our expectations,
 in both scenarios,
 the preferred model is the correlated model.
 
-# The Sinba model
+# The sinba model
 
 The main problem with Darwin's dilemma
 and the unreplicated burst scenario
@@ -333,7 +334,7 @@ just happened at the same branch,
 so the Q matrix cannot model the evolution in basal
 or independent branches
 because there is no process at all.
-In the Sinba model
+In the sinba model
 (for the *single birth of a trait*),
 a trait starts as *inactive*:
 no transitions happen.
@@ -346,13 +347,13 @@ so the process is a full process,
 or *active*.
 
 Apart from the parameters of the Q matrix,
-the Sinba model has two additional parameters:
+the sinba model has two additional parameters:
 the location of each birth event.
 It also requires the starting state after each birth event
 (by default,
 the value is set as 1.0 for the trait labeled as 1).
 
-In the `sinba package` the function to fit a pair of traits
+In the `sinba` package the function to fit a pair of traits
 to the sinba model is called `fit_sinba()`.
 By default,
 it uses the independent model,
@@ -383,7 +384,7 @@ aic_xy
 # --- x and z (unreplicated burst scenario)
 
 # Sinba model for the  unreplicated burst scenario with independent evolution
-sinba_xz_ind <- fit_sinba(tree, data_xz, model = new_model("IND"))
+sinba_xz_ind <- fit_sinba(tree, data_xz)
 # Sinba model for the  unreplicated burst scenario with independent evolution
 sinba_xz_corr <- fit_sinba(tree, data_xz, model = new_model("CORR"))
 
@@ -401,12 +402,10 @@ aic_xz <- setNames(
 aic_xz
 ```
 
-For both scenarios,
+Among the four examined models
+(Pagel and sinba models with independent and correlated evolution),
 the sinba model with independent evolution
-has the best fit
-among the examined alternatives
-(Pagel and Sinba models
-with independent and correlated evolution).
+has the best fit for both scenarios.
 
 # Cited literature
 
