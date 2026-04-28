@@ -40,6 +40,9 @@ new_model <- function(model = "", traits = 2) {
     m <- matrix(0, nrow = 2, ncol = 2)
     m[1, 2] <- 1
     m[2, 1] <- 2
+    if (model == "ER") {
+      m[2, 1] <- 1
+    }
     cm <- matrix(0, nrow = 2, ncol = 2)
     cm[1, 2] <- 1
     cm[2, 1] <- 1
