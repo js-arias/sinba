@@ -44,10 +44,11 @@
 #'   the births,
 #'   and the Q matrix used for the simulation.
 sim_sinba <- function(
-    tree, rate_mat = NULL, births = NULL,
-    model = NULL,
-    pi_x = NULL, pi_y = NULL,
-    scenario = "") {
+  tree, rate_mat = NULL, births = NULL,
+  model = NULL,
+  pi_x = NULL, pi_y = NULL,
+  scenario = ""
+) {
   if (!inherits(tree, "phylo")) {
     stop("sim_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -207,7 +208,8 @@ sim_sinba <- function(
 }
 
 sim_sinba_single <- function(
-    tree, rate_mat, births, model, pi_x) {
+  tree, rate_mat, births, model, pi_x
+) {
   t <- phylo_to_sinba(tree)
 
   if (is.null(rate_mat)) {
@@ -291,8 +293,9 @@ sim_sinba_single <- function(
 }
 
 evolve_states <- function(
-    t, Q, semi_Q, states, n, births,
-    pi_semi, pi_act, m_PI_semi, m_PI_act) {
+  t, Q, semi_Q, states, n, births,
+  pi_semi, pi_act, m_PI_semi, m_PI_act
+) {
   if (n != t$root_id) {
     a <- t$parent[n]
     b1 <- births[[1]]
@@ -316,6 +319,7 @@ evolve_states <- function(
       states[n] <- sim_evolution(Q, t$br_len[n] - b2$age, s)
     } else if (n == b1$node) {
       # birth of the semi active process
+      s <- states[a]
       s <- pick_state_at_birth(s, m_PI_semi, pi_semi)
       states[n] <- sim_evolution(Q, t$br_len[n] - b1$age, s)
     }
@@ -332,7 +336,8 @@ evolve_states <- function(
 }
 
 evolve_single_states <- function(
-    t, Q, states, n, birth, pi_act) {
+  t, Q, states, n, birth, pi_act
+) {
   if (n != t$root_id) {
     a <- t$parent[n]
     b <- birth[[1]]
