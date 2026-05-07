@@ -119,6 +119,10 @@ sim_sinba <- function(
       if (n2 == t$root_id) {
         next
       }
+      # skip the first root descendant
+      if (t$parent[n2] == t$root_id) {
+        next
+      }
       sz <- node_size(t, n2)
       if (sz > min_size && sz <= max_size) {
         break
@@ -127,7 +131,13 @@ sim_sinba <- function(
     path <- path_to_node(t, n2)
     n1 <- path[1]
     if (length(path) > 1) {
-      n1 <- sample(path, size = 1)
+      while (TRUE) {
+        n1 <- sample(path, size = 1)
+        # skip the root
+        if (n1 != t$root_id) {
+          break
+        }
+      }
     }
     births <- list()
     births[[1]] <- list(node = n1)
