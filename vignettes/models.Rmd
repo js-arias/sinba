@@ -18,18 +18,23 @@ knitr::opts_chunk$set(
 library(sinba)
 ```
 
-The main purpose of models defined in Sinba
+The main purpose of models defined in `sinba` package
 is to indicate the parameters of the **Q matrix**
 that are to be estimated.
-In the Sinba package,
+In the `sinba` package,
 each parameter is identified by a positive number,
 while values in zero indicate a zero transition rate.
 If the numbers are repeated,
 it is assumed that they represent the same parameter.
 
+In two trait models,
+the first trait is identified as *x*,
+and the second trait is identified as *y*.
+
 By default,
-a Pagel's independent model (1994)
-for two traits is used in most functions:
+the function `new_model()`
+creates a Pagel's independent model (1994)
+for two traits:
 
 ```{r}
 new_model()
@@ -80,17 +85,13 @@ Other "canned" (i.e., predefined) models are:
   It is a correlated model.
   It has four parameters.
 - "x":
-  A correlated model in which x
-  (the first trait)
-  depends on y
-  (the second trait).
+  A correlated model in which *x*
+  depends on *y*.
   It is a correlated model.
   It has six parameters.
 - "y":
-  A correlated model in which y
-  (the second trait)
-  depends on x
-  (the first trait).
+  A correlated model in which *y*
+  depends on *x*.
   It is a correlated model.
   It has six parameters.
 - "CORR":
@@ -125,7 +126,7 @@ unobserved states
 (that is,
 'hidden' states).
 There are two forms of viewing hidden states,
-and both are supported in Sinba.
+and both are supported in `sinba` package.
 In the first form,
 one or more states will have each two
 or more hidden states.
@@ -252,7 +253,7 @@ model_join(m1, m2)
 
 # Model edition
 
-While the sinba package provides several predefined models,
+While the `sinba` package provides several predefined models,
 it does not exhaust all model possibilities.
 Nevertheless,
 it has some functionality to edit the models,

@@ -349,9 +349,14 @@ or *active*.
 Apart from the parameters of the Q matrix,
 the sinba model has two additional parameters:
 the location of each birth event.
-It also requires the starting state after each birth event
-(by default,
-the value is set as 1.0 for the trait labeled as 1).
+We need to define a *reset vector*.
+This vector indicates what happened at the birth event.
+By default,
+the functions in the `sinba` package
+assume that the state of the trait after a birth
+is always in the state 1.
+If you do not know the initial state,
+you can set it to (0.5, 0.5).
 
 In the `sinba` package the function to fit a pair of traits
 to the sinba model is called `fit_sinba()`.
@@ -364,9 +369,20 @@ we can define a correlated model as well:
 # --- x and y (Darwin's scenario)
 
 # Sinba model for the Darwin's scenario with independent evolution
-sinba_xy_ind <- fit_sinba(tree, data_xy)
+sinba_xy_ind <- fit_sinba(tree, data_xy,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters
+  # we put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1)
+)
 # Sinba model for the Darwin's scenario with correlated evolution
-sinba_xy_corr <- fit_sinba(tree, data_xy, model = new_model("CORR"))
+sinba_xy_corr <- fit_sinba(tree, data_xy,
+  model = new_model("CORR"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters
+  # we put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1)
+)
 
 # compare AIC values from Pagel's models
 # and Sinba models
@@ -384,9 +400,20 @@ aic_xy
 # --- x and z (unreplicated burst scenario)
 
 # Sinba model for the  unreplicated burst scenario with independent evolution
-sinba_xz_ind <- fit_sinba(tree, data_xz)
+sinba_xz_ind <- fit_sinba(tree, data_xz,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters
+  # we put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1)
+)
 # Sinba model for the  unreplicated burst scenario with independent evolution
-sinba_xz_corr <- fit_sinba(tree, data_xz, model = new_model("CORR"))
+sinba_xz_corr <- fit_sinba(tree, data_xz,
+  model = new_model("CORR"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters
+  # we put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1)
+)
 
 # compare AIC values from Pagel's models
 # and Sinba models

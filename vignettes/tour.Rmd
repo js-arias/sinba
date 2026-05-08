@@ -1,0 +1,907 @@
+---
+title: "A tour of sinba package"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{A tour of sinba package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(sinba)
+```
+
+In this vignette
+we will explore the functionality of the `sinba` package.
+It is expected that you have some familiarity with
+`vignette("Basic use of Sinba model")`
+and `vignette("How to make custom models")`.
+
+# Input data
+
+The main data sources in sinba package are a *phylogenetic tree*,
+a `ape::phylo` object as use in packages such as `package("ape")`
+(Paradis & Schliep, 2019)
+and `package("phytools")`
+(Revell, 2024),
+and the *data of the observed tips* in a data frame.
+The first column of the data frame
+contains the name of the tips of the tree,
+and the following columns contain the observed state of the data
+(either 0 or 1).
+
+```{r}
+library(phytools)
+
+# seed to make the example reproducible
+set.seed(6)
+
+# a phylogenetic tree
+tree <- pbtree(n = 26, tip.label = LETTERS)
+
+x <- c(
+  1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1,
+  rep(0, 12)
+)
+y <- c(
+  0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1,
+  rep(0, 12)
+)
+
+# observed data
+data_xy <- data.frame(taxa = LETTERS, x = x, y = y)
+```
+
+Because the tree is a `ape::phylo` object,
+we can use `phytools` to plot the data:
+
+```{r}
+library(RColorBrewer)
+
+plotTree.datamatrix(tree,
+  data.frame(
+    x = as.factor(setNames(data_xy$x, data_xy$taxa)),
+    y = as.factor(setNames(data_xy$y, data_xy$taxa)),
+    row.names = data_xy$taxa
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+```
+
+# Fitting models
+
+The main usage of the `sinba` package
+is to fit models
+to detect the correlation between two traits
+using the *sinba* ("single birth of a trait") model.
+
+## A single trait
+
+Before attempting to test for correlation,
+here we will compare the traditional *Mk* model
+(Pagel, 1994;
+Lewis, 2001)
+with a *sinba* model for a single trait.
+The main function is `fit_sinba()`,
+as this function by default assumes a model with two traits,
+we should explicitly define a model
+with a single trait with the function `new_model()`
+using the parameter `traits`.
+As a new model with a single trait will be by default an "*ARD*" model,
+we need to explicitly define it to be an "*ER*" model.
+We need to define a *reset vector*.
+This vector indicates what happened at the birth event.
+By default,
+the functions in the `sinba` package
+assume that the state of the trait after a birth
+is always in the state 1.
+If you do not know the initial state,
+you can set it to (0.5, 0.5).
+The function parameter to set the reset vector is `pi_x`.
+By default,
+fit functions in the `sinba` package
+use the root prior defined by FitzJohn et al. (2009),
+that is,
+scaling the likelihood at the root
+with the normalized likelihood values.
+Specific root priors can be defined with the `root` parameter.
+
+```{r}
+# fit a single trait using PhyTools
+# an equal rates model
+fit_x_er <- fitMk(tree, as.factor(setNames(data_xy$x, data_xy$taxa)),
+  model = "ER", pi = "fitzjohn"
+)
+# an all rates different model
+fit_x_ard <- fitMk(tree, as.factor(setNames(data_xy$x, data_xy$taxa)),
+  model = "ARD", pi = "fitzjohn"
+)
+
+# now we fit the sinba model with a single trait
+# an equal rates different model
+sinba_x_er <- fit_sinba(
+  tree, data_xy,
+  # we set the model to ER model
+  # with a single trait.
+  model = new_model(model = "ER", traits = 1),
+  # As this is the default
+  # we can safely ignore the pi_x parameter.
+  # We put it here just for completeness
+  pi_x = c(0, 1),
+  # As we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+# an all rates different model
+sinba_x_ard <- fit_sinba(tree, data_xy,
+  # the default model for a single trait is the ARD model
+  model = new_model(traits = 1),
+  # As this is the default
+  # we can safely ignore the pi_x parameter.
+  # We put it here just for completeness
+  pi_x = c(0, 1),
+  # As we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+
+# the fit results can be printed with useful information
+# about the results
+sinba_x_ard
+
+# as fit objects in phytools and sinba implement the AIC generic
+# we can easily compare the models:
+aic_single <- setNames(
+  c(
+    AIC(fit_x_er),
+    AIC(fit_x_ard),
+    AIC(sinba_x_er),
+    AIC(sinba_x_ard)
+  ),
+  c("Mk-ER", "Mk-ARD", "sinba-ER", "sinba-ARD")
+)
+aic_single
+```
+
+As an exercise,
+do the same analysis,
+but for the second trait.
+
+## Testing correlation between two traits
+
+The main use of the `sinba` package
+is to test the correlation between two traits
+(Pagel, 1994).
+To fit the data to a sinba model
+we use the `fit_sinba()` function.
+If we want to fit the data to a traditional Pagel model,
+we use the function `fit_pagel()`.
+In both functions we need to define a model
+(the default is the independent model).
+As we are using default "canned" models,
+we can use the function `new_model()`
+with the parameter `model` set as "*CORR*".
+In the case of the sinba model,
+we need to define the reset vector for both traits.
+By default,
+in `sinba` package this vector is set to be 1.0
+for the state 1 in both *x* and *y* traits.
+
+```{r}
+# Pagel model
+pagel_xy_ind <- fit_pagel(tree, data_xy)
+pagel_xy_corr <- fit_pagel(tree, data_xy, model = new_model("CORR"))
+
+# print the results
+pagel_xy_ind
+pagel_xy_corr
+
+# sinba model
+sinba_xy_ind <- fit_sinba(tree, data_xy,
+  # As this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # As we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+sinba_xy_corr <- fit_sinba(tree, data_xy,
+  model = new_model("CORR"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+
+# print the results
+sinba_xy_ind
+sinba_xy_corr
+
+# compare AIC values from Pagel's models
+# and Sinba models
+aic_xy <- setNames(
+  c(
+    AIC(pagel_xy_ind),
+    AIC(pagel_xy_corr),
+    AIC(sinba_xy_ind),
+    AIC(sinba_xy_corr)
+  ),
+  c("Pagel-IND", "Pagel-CORR", "Sinba-IND", "Sinba-CORR")
+)
+aic_xy
+```
+
+## Other trait models
+
+The `sinba` package includes several canned models,
+and also it is possible to edit model parameters,
+so the model universe is quite flexible.
+See the `vignette("How to make custom models")`
+for more information.
+These models can be used by both `fit_sinba()`
+and `fit_pagel()` functions.
+
+Here,
+we want to also fit the equal rates model ("*ER*")
+and the symmetric model ("*SYM*").
+We also use a custom model
+that has equal rates for trait *x*
+and all rates different for trait *y*.
+
+```{r}
+# Equal Rates model with sinba
+fit_sinba(tree, data_xy, new_model("ER"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness.
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+
+# Symmetric model with sinba
+fit_sinba(tree, data_xy, new_model("SYM"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+
+# a custom model
+m <- new_model()
+m <- model_equate(m, c(2, 4))
+m
+
+# fit the custom model with sinba
+fit_sinba(tree, data_xy, m,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+## Alternative birth models
+
+Suppose we got the trait *w*
+and we want to couple it with the previous trait *x*:
+
+```{r}
+w <- c(
+  1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1,
+  rep(0, 12)
+)
+
+data_xw <- data.frame(taxa = LETTERS, x = x, y = w)
+
+# plot the data
+plotTree.datamatrix(tree,
+  data.frame(
+    x = as.factor(setNames(data_xw$x, data_xw$taxa)),
+    w = as.factor(setNames(data_xw$y, data_xw$taxa)),
+    row.names = data_xw$taxa
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# fit sinba model
+fit_sinba(tree, data_xw,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+Note that both traits are born at the same node,
+so maybe we can fit a model in which both traits are born simultaneously,
+and then we can drop one of the birth event parameters.
+This can be done with the function `fit_simultaneous()`.
+In this case,
+our reset vector has four elements
+(as any combination of the four states are possible;
+they are 00, 01, 10, and 11).
+The default is that the trait starts at 11,
+but can be changed with the `pi_xy` parameter.
+
+```{r}
+# fit sinba model with a simultaneous birth
+fit_simultaneous(tree, data_xw,
+  # as this is the default
+  # we can safely ignore the pi_xy parameter.
+  # We put it here just for completeness
+  pi_xy = c(0, 0, 0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+In the following example,
+we got the trait *z*,
+and we want to model it simultaneously with *x*:
+
+```{r}
+z <- c(
+  0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1,
+  1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1
+)
+
+data_xz <- data.frame(taxa = LETTERS, x = x, y = z)
+
+# plot the data
+plotTree.datamatrix(tree,
+  data.frame(
+    x = as.factor(setNames(data_xz$x, data_xz$taxa)),
+    z = as.factor(setNames(data_xz$y, data_xz$taxa)),
+    row.names = data_xz$taxa
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# fit sinba model
+fit_sinba(tree, data_xz,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+Note that the second trait is born at the root
+(or at any point before the root node),
+so instead of fitting two birth events,
+we can fit just a single birth event
+and leave the second event as a birth fixed at the root.
+The function to do that is `fit_mixed()`.
+In this case,
+we need a single reset vector,
+`pi_trait`,
+which by default assumes that the trait is born at state 1.
+We also need to define the trait that is a free parameter
+(the parameter is `trait` and by default,
+as in this case,
+is *x*,
+the first trait):
+
+```{r}
+# fit sinba with a free birth and a birth fixed at the root
+fit_mixed(tree, data_xz,
+  # this is the default
+  # so we can safely ignore trait parameter.
+  # We put it here for completeness
+  trait = "x",
+  # as this is the default
+  # we can safely ignore the pi_trait parameter.
+  # We put it here just for completeness
+  pi_trait = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+## Hidden models
+
+Package `sinba` supports the definition of hidden models
+(Marazzi et al., 2012;
+Beaulieu et al., 2013).
+In this example,
+we observe the trait *h*
+and want to model it in conjunction with trait *x*:
+
+```{r}
+h <- c(
+  1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1,
+  rep(0, 12)
+)
+
+data_xh <- data.frame(taxa = LETTERS, x = x, y = h)
+
+# plot the data
+plotTree.datamatrix(tree,
+  data.frame(
+    x = as.factor(setNames(data_xh$x, data_xh$taxa)),
+    h = as.factor(setNames(data_xh$y, data_xh$taxa)),
+    row.names = data_xh$taxa
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# fit sinba model
+fit_sinba(tree, data_xh,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+Now we create a hidden model with two rates
+and set that any rate change
+should have the same rate:
+
+```{r}
+# a hidden model with two rates
+hm <- new_rates_model(new_model("IND"), rates = c("a", "b"))
+hm <- model_equate_trans_rates(hm)
+hm
+```
+
+Now we fit the hidden model.
+Because it is a hidden model,
+the state space is bigger,
+so we have to take that into account
+when defining the reset vectors.
+
+```{r}
+# fit sinba model using the hidden model
+fit_sinba(tree, data_xh,
+  model = hm,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1, 0, 1), pi_y = c(0, 1, 0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+In this example,
+the hidden model does not improve
+the simpler single-rate model.
+That is expected in our tiny dataset.
+In more realistic (bigger) data sets,
+sometimes hidden models offer a considerably better explanation.
+
+## Fixed values
+
+Most of the time,
+we want to infer the parameters of the model.
+But in some cases,
+we already have some fixed values for those parameters
+(maybe from previous research
+or just to see what if…?).
+
+If we know the birth locations
+and want to know which is the best Q matrix,
+we can use the function `fit_fixed_births()`.
+
+```{r}
+# birth list
+bb <- list(
+  # trait x
+  list(
+    node = 28, # we use the node labels to identify nodes
+    age = 0 # birth at the beginning of the branch
+  ),
+  # trait y
+  list(
+    node = 29,
+    age = 0
+  )
+)
+
+# fit sinba with fixed births
+fit_fixed_births(tree, data_xy, bb,
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+Maybe we know the Q matrix,
+and we want to fit the birth locations.
+In that case we use `fit_fixed_matrix()`.
+Note that if you are using a hidden model,
+you also need to include the model definition
+(the `model` parameter).
+
+```{r}
+# Q matrix
+q <- matrix(c(
+  0,   5e-10, 5e-10, 0,
+  0.6, 0,     0,     5e-10,
+  0.4, 0,     0,     5e-10,
+  0,   0.4,   0.6,   0
+), byrow = TRUE, nrow = 4)
+
+# fit sinba with fixed Q
+fit_fixed_matrix(tree, data_xy, q,
+  # the model itself has no influence,
+  # it is just used to connect the observed states
+  # with the matrix IDs,
+  # which is need for hidden models.
+  # By default,
+  # it uses the independent model.
+  model = new_model("IND"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter
+  # We put it here just for completeness.
+  root = NULL
+)
+```
+
+If you have both the birth events
+and the Q matrix,
+you can estimate the likelihood using the `fixed_sinba()` function.
+
+```{r}
+# fit sinba with fixed births and Q matrix
+fixed_sinba(tree, data_xy, q, bb,
+  # the model itself has no influence,
+  # it is just used to connect the observed states
+  # with the matrix IDs,
+  # which is need for hidden models.
+  # By default,
+  # it uses the independent model.
+  model = new_model("IND"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # as we use the default
+  # (the FitzJohn prior)
+  # we can safely ignore the root parameter.
+  # We put it here just for completeness
+  root = NULL
+)
+```
+
+# Stochastic mapping
+
+With `sinba` package you can make stochastic maps
+(Nielsen, 2002)
+using the sinba model.
+The function to do that is `map_sinba()`.
+The resulting reconstruction
+is an object of type `phytools::multiSimmap`,
+so you can use `package("phytools")`
+to manipulate it
+(for example,
+for plotting).
+
+```{r}
+# to make stochastic mappings
+# you need a fitted sinba object
+# (e.g. the results of `fit_sinba()`)
+# and the number of simulations
+# (default is 100).
+mp <- map_sinba(sinba_xy_ind, 100)
+
+# plot the first map
+plot(mp[[1]])
+```
+
+Note that our single follows the expected pattern:
+the traits do not change at all in the *inactive* part,
+and only the first trait changes in the *semi-active* part.
+
+```{r}
+# make a summary (using phytools)
+sm <- summary(mp)
+sm
+
+# plot the summary
+plot(sm)
+```
+
+As can be seen from our 100 stochastic maps,
+all the simulated histories are constrained
+by our birth event inferences.
+
+# Simulations
+
+The `sinba` package also includes some facilities
+to simulate data under the sinba model.
+The function for simulations is `sim_sinba()`.
+
+## Maddison & FitzJohn scenarios
+
+The most simple simulations are based on Maddison & FitzJohn (2015) scenarios.
+These are canned models that are built in an algorithmic way;
+that is,
+there is not a specific underlying model to generate the data.
+But they are useful,
+because they reflect situations
+for which we have an intuitive idea
+on how the methods should react.
+
+```{r}
+# a simulated tree with 50 tips
+sim_tree <- pbtree(n = 50)
+
+# simulate scenarios
+darwin <- sim_sinba(sim_tree, scenario = "darwin")
+unrep <- sim_sinba(sim_tree, scenario = "unrep")
+codis <- sim_sinba(sim_tree, scenario = "codis")
+burst <- sim_sinba(sim_tree, scenario = "burst")
+
+# plot the darwin scenario
+plotTree.datamatrix(sim_tree,
+  data.frame(
+    x = as.factor(setNames(darwin$data$x, darwin$data$t.tip)),
+    y = as.factor(setNames(darwin$data$y, darwin$data$t.tip)),
+    row.names = darwin$data$t.tip
+  ),
+  ftype = "off", space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# plot the unreplicated burst scenario
+plotTree.datamatrix(sim_tree,
+  data.frame(
+    x = as.factor(setNames(unrep$data$x, unrep$data$t.tip)),
+    y = as.factor(setNames(unrep$data$y, unrep$data$t.tip)),
+    row.names = unrep$data$t.tip
+  ),
+  ftype = "off", space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# plot the codistribution scenario
+plotTree.datamatrix(sim_tree,
+  data.frame(
+    x = as.factor(setNames(codis$data$x, codis$data$t.tip)),
+    y = as.factor(setNames(codis$data$y, codis$data$t.tip)),
+    row.names = codis$data$t.tip
+  ),
+  ftype = "off", space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# plot the replicated burst scenario
+plotTree.datamatrix(sim_tree,
+  data.frame(
+    x = as.factor(setNames(burst$data$x, burst$data$t.tip)),
+    y = as.factor(setNames(burst$data$y, burst$data$t.tip)),
+    row.names = burst$data$t.tip
+  ),
+  ftype = "off", space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+```
+
+As an exercise,
+fit the Pagel and sinba models to the simulated scenarios.
+
+## Full simulation
+
+A complete simulation under the sinba model
+requires that we define all the model parameters,
+that is,
+the Q matrix and the birth events.
+Simulated data sets always start at the 00 state.
+
+```{r}
+# Q matrix
+qq <- matrix(c(
+  0, 0.5, 0.2, 0,
+  0.3, 0, 0, 0.2,
+  0.4, 0, 0, 0.5,
+  0, 0.4, 0.3, 0
+), byrow = TRUE, nrow = 4)
+
+# birth list
+bb <- list(
+  # trait x
+  list(
+    node = 28, # we use the node labels to identify nodes
+    age = 0 # birth at the beginning of the branch
+  ),
+  # trait y
+  list(
+    node = 31,
+    age = 0
+  )
+)
+
+# make the simulation
+sim_data <- sim_sinba(tree,
+  rate_mat = qq, births = bb,
+  # the model itself has no influence,
+  # it is just used to connect the observed states
+  # with the matrix IDs,
+  # which is need for hidden models.
+  # By default,
+  # it uses the independent model.
+  model = new_model("IND"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1),
+)
+
+# plot the simulated data
+plotTree.datamatrix(tree,
+  data.frame(
+    x = as.factor(setNames(sim_data$data$x, sim_data$data$t.tip)),
+    y = as.factor(setNames(sim_data$data$y, sim_data$data$t.tip)),
+    row.names = LETTERS
+  ),
+  fsize = 1, space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+
+# if birds are undefined
+# it select two valid births at random
+sim_data_50 <- sim_sinba(sim_tree,
+  rate_mat = qq,
+  # the model itself has no influence,
+  # it is just used to connect the observed states
+  # with the matrix IDs,
+  # which is need for hidden models.
+  # By default,
+  # it uses the independent model.
+  model = new_model("IND"),
+  # as this is the default
+  # we can safely ignore both the the pi_x and pi_y parameters.
+  # We put them here just for completeness
+  pi_x = c(0, 1), pi_y = c(0, 1)
+)
+
+# plot the simulated data
+plotTree.datamatrix(sim_tree,
+  data.frame(
+    x = as.factor(setNames(sim_data_50$data$x, sim_data_50$data$t.tip)),
+    y = as.factor(setNames(sim_data_50$data$y, sim_data_50$data$t.tip)),
+    row.names = sim_data_50$data$t.tip
+  ),
+  ftype = "off", space = 0.2, xexp = 1.4,
+  palettes = c("Blues", "Greens")
+)
+```
+
+# Cited literature
+
+Beaulieu, J. M., O'Meara, B. C., & Donoghue, M. J.
+(2013).
+Identifying hidden rate changes in the evolution of a binary morphological character: the evolution of plant habit in campanulid angiosperms.
+*Systematic Biology*,
+**62**, 725-737.
+DOI: [10.1093/sysbio/syt034](https://doi.org/10.1093/sysbio/syt034).
+
+FitzJohn, R. G., Maddison, W. P., & Otto, S. P.
+(2009).
+Estimating trait-dependent speciation and extinction rates from incompletely resolved phylogenies.
+*Systematic Biology*,
+**58**, 595-611.
+DOI: [10.1093/sysbio/syp067](https://doi.org/10.1093/sysbio/syp067).
+
+Lewis, P. O.
+(2001).
+A likelihood approach to estimating phylogeny from discrete morphological character data.
+*Systematic biology*,
+**50**, 913-925.
+DOI: [10.1080/106351501753462876](https://doi.org/10.1080/106351501753462876).
+
+Maddison, W. P., & FitzJohn, R. G.
+(2015).
+The unsolved challenge to phylogenetic correlation tests for categorical characters.
+*Systematic Biology*,
+**64**, 127-136.
+DOI: [10.1093/sysbio/syu070](https://doi.org/10.1093/sysbio/syu070).
+
+Marazzi, B., Ané, C., Simon, M. F., Delgado-Salinas, A., Luckow, M., & Sanderson, M. J.
+(2012).
+Locating evolutionary precursors on a phylogenetic tree.
+*Evolution*,
+**66**, 3918-3930.
+DOI: [10.1111/j.1558-5646.2012.01720.x](https://doi.org/10.1111/j.1558-5646.2012.01720.x).
+
+Nielsen, R.
+(2002).
+Mapping mutations on phylogenies.
+*Systematic Biology*,
+**51**, 729-739.
+DOI: [10.1080/10635150290102393](https://doi.org/10.1080/10635150290102393).
+
+Pagel, M.
+(1994).
+Detecting correlated evolution on phylogenies: a general method for the comparative analysis of discrete characters.
+*Proceedings of the Royal Society of London. Series B: Biological Sciences*,
+**255**, 37-45.
+DOI: [10.1098/rspb.1994.0006](https://doi.org/10.1098/rspb.1994.0006).
+
+Paradis, E., Schliep, K.
+(2019).
+ape 5.0: an environment for modern phylogenetics and evolutionary analyses in R.
+*Bioinformatics*,
+**35**, 526-528.
+DOI: [10.1093/bioinformatics/bty633](https:://doi.org/10.1093/bioinformatics/bty633).
+
+Revell, L.
+(2024).
+phytools 2.0: an updated R ecosystem for phylogenetic comparative methods (and other things).
+*PeerJ*,
+**12**, e16505.
+DOI: [10.7717/peerj.16505](https://doi.org/10.7717/peerj.16505).
