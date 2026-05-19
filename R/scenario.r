@@ -87,19 +87,6 @@ is_valid_birth <- function(t, ev, yn) {
   return(is_parent(t, ev, yn))
 }
 
-# set_root_prior sets the priors of the root
-# taking into account the birth events.
-set_root_prior <- function(t, model, root, births, youngest) {
-  obs_prior <- update_root(t, rep(1, 4), births, youngest)
-  names(obs_prior) <- c("00", "01", "10", "11")
-  prior <- rep(0, length(root))
-  for (i in seq_len(length(root))) {
-    obs <- model$observed[[model$states[i]]]
-    prior[i] <- root[i] * obs_prior[obs]
-  }
-  return(prior)
-}
-
 # set_root_prior_single sets the prior of the root
 # taking into account the birth events
 # for a single trait.
@@ -299,15 +286,40 @@ active_ancestor_vector <- function(sc) {
   stop(sprintf("invalid scenario: '%s'", sc))
 }
 
-default_pi_vector <- function(states) {
+default_pi_vector <- function() {
+  return(c(0, 1))
+}
+
+expand_pi_vector <- function(states, pv) {
+  if (sum(pv) != 0) {
+    pv <- pv / sum(pv)
+  }
+  c0 <- 0
+  c1 <- 0
+  for (i in seq_len(length(states))) {
+    s <- strsplit(states[i], split = "", fixed = TRUE)[[1]]
+    if (length(s) < 2) {
+      next
+    }
+    if (s[2] == "0") {
+      c0 <- c0 + 1
+    }
+    if (s[2] == "1") {
+      c1 <- c1 + 1
+    }
+  }
+
   pi <- rep(0, length(states))
   for (i in seq_len(length(states))) {
     s <- strsplit(states[i], split = "", fixed = TRUE)[[1]]
     if (length(s) < 2) {
       next
     }
+    if (s[2] == "0") {
+      pi[i] <- pv[1] / c0
+    }
     if (s[2] == "1") {
-      pi[i] <- 1
+      pi[i] <- pv[2] / c1
     }
   }
   return(pi)
@@ -324,4 +336,39 @@ set_pi_matrix <- function(m_PI, v_pi) {
     }
   }
   return(m)
+}
+
+default_root_prior <- function() {
+  return(rep(0, 4))
+}
+
+# set_root_prior sets the priors of the root
+set_root_prior <- function(model, root) {
+  prior <- rep(0, length(model$states))
+
+  # FitzJohn prior
+  if (sum(root) == 0) {
+    return(prior)
+  }
+
+  root <- root / sum(root)
+  counts <- rep(0, 4)
+  names(counts) <- c("00", "01", "10", "11")
+  if (model$traits == 1) {
+    counts <- rep(0, 2)
+    names(counts) <- c("0", "1")
+    names(root) <- c("0", "1")
+  } else {
+    names(root) <- c("00", "01", "10", "11")
+  }
+  for (i in seq_len(length(model$states))) {
+    obs <- model$observed[[model$states[[i]]]]
+    counts[obs] <- counts[obs] + 1
+  }
+
+  for (i in seq_len(length(prior))) {
+    obs <- model$observed[[model$states[[i]]]]
+    prior[i] <- root[obs] / counts[obs]
+  }
+  return(prior)
 }

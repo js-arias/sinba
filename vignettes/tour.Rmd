@@ -140,7 +140,7 @@ sinba_x_er <- fit_sinba(
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0)
 )
 # an all rates different model
 sinba_x_ard <- fit_sinba(tree, data_xy,
@@ -154,7 +154,7 @@ sinba_x_ard <- fit_sinba(tree, data_xy,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0)
 )
 
 # the fit results can be printed with useful information
@@ -218,7 +218,7 @@ sinba_xy_ind <- fit_sinba(tree, data_xy,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 sinba_xy_corr <- fit_sinba(tree, data_xy,
   model = new_model("CORR"),
@@ -230,7 +230,7 @@ sinba_xy_corr <- fit_sinba(tree, data_xy,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 
 # print the results
@@ -279,7 +279,7 @@ fit_sinba(tree, data_xy, new_model("ER"),
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 
 # Symmetric model with sinba
@@ -292,7 +292,7 @@ fit_sinba(tree, data_xy, new_model("SYM"),
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 
 # a custom model
@@ -310,7 +310,7 @@ fit_sinba(tree, data_xy, m,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -348,7 +348,7 @@ fit_sinba(tree, data_xw,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -374,7 +374,7 @@ fit_simultaneous(tree, data_xw,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -411,7 +411,7 @@ fit_sinba(tree, data_xz,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -446,7 +446,7 @@ fit_mixed(tree, data_xz,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -488,7 +488,7 @@ fit_sinba(tree, data_xh,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -504,10 +504,24 @@ hm
 ```
 
 Now we fit the hidden model.
-Because it is a hidden model,
-the state space is bigger,
-so we have to take that into account
-when defining the reset vectors.
+While the state space in hidden models is larger,
+this space is unobserved,
+so the reset vector and the root prior are defined
+in the same way as in a non-hidden model
+(just the values for 0 and 1,
+in the case of the reset vector,
+and the values of 00, 01, 10, and 11 for the root prior).
+The functions in sinba
+will automatically expand the vectors
+taking into account the hidden states,
+dividing the probability of each state
+equally among hidden states
+(for example, the vector
+(0.20, 0.80),
+in which both trait states have two hidden states,
+will be expanded to have a prior of 0.1
+for both hidden states corresponding to 0
+and 0.4 for both hidden states corresponding to 1).
 
 ```{r}
 # fit sinba model using the hidden model
@@ -516,12 +530,12 @@ fit_sinba(tree, data_xh,
   # as this is the default
   # we can safely ignore both the the pi_x and pi_y parameters.
   # We put them here just for completeness
-  pi_x = c(0, 1, 0, 1), pi_y = c(0, 1, 0, 1),
+  pi_x = c(0, 1), pi_y = c(0, 1),
   # as we use the default
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -570,7 +584,7 @@ fit_fixed_births(tree, data_xy, bb,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -607,7 +621,7 @@ fit_fixed_matrix(tree, data_xy, q,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter
   # We put it here just for completeness.
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 
@@ -633,7 +647,7 @@ fixed_sinba(tree, data_xy, q, bb,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = NULL
+  root = c(0, 0, 0, 0)
 )
 ```
 

@@ -1,7 +1,8 @@
 fit_sinba_single <- function(
-    tree, data, model,
-    pi_x, root,
-    opts) {
+  tree, data, model,
+  pi_x, root,
+  opts
+) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -11,21 +12,23 @@ fit_sinba_single <- function(
   k <- max(mQ) + 1
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$states)
+    pi_x <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$states)) {
+  if (length(pi_x) != 2) {
     stop("fit_sinba: invalid pi_x: size different to number of states")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
+  pi_x <- expand_pi_vector(model$states, pi_x)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- c(0, 0)
+  }
+  if (length(root) != 2) {
+    stop("fit_sinba: invalid root: size should be 2")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -58,7 +61,7 @@ fit_sinba_single <- function(
       Q <- from_model_to_Q(mQ, p[2:length(p)])
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
-        r, pi_x, root
+        r, pi_x, root_prior
       )
       return(-lk)
     })
@@ -128,9 +131,10 @@ fit_sinba_single <- function(
 }
 
 fit_sinba_single_fixed_birth <- function(
-    tree, data, birth, model,
-    pi_x, root,
-    opts) {
+  tree, data, birth, model,
+  pi_x, root,
+  opts
+) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_births: `tree` must be an object of class \"phylo\".")
   }
@@ -140,21 +144,23 @@ fit_sinba_single_fixed_birth <- function(
   k <- max(mQ)
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$states)
+    pi_x <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$states)) {
+  if (length(pi_x) != 2) {
     stop("fit_fixed_births: invalid pi_x: size different to number of states")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
+  pi_x <- expand_pi_vector(model$states, pi_x)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- c(0, 0)
+  }
+  if (length(root) != 2) {
+    stop("fit_fixed_births: invalid root: size should be 2")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -191,7 +197,7 @@ fit_sinba_single_fixed_birth <- function(
       Q <- from_model_to_Q(mQ, p)
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
-        r, pi_x, root
+        r, pi_x, root_prior
       )
       return(-lk)
     })
@@ -278,8 +284,9 @@ fit_sinba_single_fixed_birth <- function(
 }
 
 fit_sinba_single_fixed_matrix <- function(
-    tree, data, rate_mat, model,
-    pi_x, root, opts) {
+  tree, data, rate_mat, model,
+  pi_x, root, opts
+) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
   }
@@ -300,21 +307,23 @@ fit_sinba_single_fixed_matrix <- function(
   }
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$states)
+    pi_x <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$states)) {
+  if (length(pi_x) != 2) {
     stop("fit_fixed_matrix: invalid pi_x: size different to number of states")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
+  pi_x <- expand_pi_vector(model$states, pi_x)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- c(0, 0)
+  }
+  if (length(root) != 2) {
+    stop("fit_fixed_matrix: invalid root: size should be 2")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -342,7 +351,7 @@ fit_sinba_single_fixed_matrix <- function(
 
       lk <- sinba_single_like(
         t, rate_mat, model, birth, xt, cond,
-        r, pi_x, root
+        r, pi_x, root_prior
       )
       return(-lk)
     })
@@ -411,8 +420,9 @@ fit_sinba_single_fixed_matrix <- function(
 }
 
 fixed_sinba_single <- function(
-    tree, data, rate_mat, birth,
-    model, pi_x, root) {
+  tree, data, rate_mat, birth,
+  model, pi_x, root
+) {
   if (!inherits(tree, "phylo")) {
     stop("fixed_sinba: `tree` must be an object of class \"phylo\".")
   }
@@ -431,21 +441,23 @@ fixed_sinba_single <- function(
   }
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$states)
+    pi_x <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$states)) {
+  if (length(pi_x) != 2) {
     stop("fixed_sinba: invalid pi_x: size different to number of states")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
+  pi_x <- expand_pi_vector(model$states, pi_x)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- c(0, 0)
+  }
+  if (length(root) != 2) {
+    stop("fixed_sinba: invalid root: size should be 2")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 1)
   cond <- set_conditionals(t, et, model)
@@ -491,7 +503,7 @@ fixed_sinba_single <- function(
     xt <- tree_to_cpp(t)
     lk <- sinba_single_like(
       t, rate_mat, model, birth, xt, cond,
-      r, pi_x, root
+      r, pi_x, root_prior
     )
 
     if (lk > res$objective) {
@@ -538,16 +550,18 @@ fixed_sinba_single <- function(
 # sinba_single calculates the likelihood of a single trait
 # under the sinba model.
 sinba_single_like <- function(
-    t, Q, model, birth,
-    xt, cond, root, pi_x, pi_root) {
+  t, Q, model, birth,
+  xt, cond, root, pi_x, pi_root
+) {
   l <- sinba_single_cond(t, Q, model, birth, xt, cond, root, pi_x)
 
   return(add_root_prior(l[t$root_id, ], pi_root))
 }
 
 sinba_single_cond <- function(
-    t, Q, model, birth,
-    xt, cond, root, pi_x) {
+  t, Q, model, birth,
+  xt, cond, root, pi_x
+) {
   # make sure the Q matrix is valid
   Q <- normalize_Q(Q)
   m_PI_root <- build_pi_matrix(model, "x", state_vector(model, "x"))

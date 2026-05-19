@@ -36,10 +36,11 @@ maximum_transition_rate <- 1000
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_sinba <- function(
-    tree, data, model = NULL,
-    pi_x = NULL, pi_y = NULL,
-    root = NULL,
-    opts = NULL) {
+  tree, data, model = NULL,
+  pi_x = NULL, pi_y = NULL,
+  root = NULL,
+  opts = NULL
+) {
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -58,30 +59,30 @@ fit_sinba <- function(
   t <- phylo_to_sinba(tree)
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+    pi_x <- default_pi_vector()
   }
   if (length(pi_y) == 0) {
-    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+    pi_y <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
-    stop("fit_sinba: invalid pi_x: size different to number of states")
+  if (length(pi_x) != 2) {
+    stop("fit_sinba: invalid pi_x: size should be 2")
   }
-  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
-    stop("fit_sinba: invalid pi_y: size different to number of states")
+  if (length(pi_y) != 2) {
+    stop("fit_sinba: invalid pi_y: size should be 2")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
-  if (sum(pi_y) != 0) {
-    pi_y <- pi_y / sum(pi_y)
-  }
+  pi_x <- expand_pi_vector(model$trait_states[["x"]]$states, pi_x)
+  pi_y <- expand_pi_vector(model$trait_states[["y"]]$states, pi_y)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- default_root_prior()
+  }
+  if (length(root) != 4) {
+    stop("fit_sinba: invalid root: size should be 4")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -120,7 +121,7 @@ fit_sinba <- function(
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        r, pi_x, pi_y, root
+        r, pi_x, pi_y, root_prior
       )
       return(-lk)
     })
@@ -299,7 +300,11 @@ print.fit_sinba <- function(x, digits = 6, ...) {
     } else {
       cat("Root prior:\n")
       root <- x$root
-      names(root) <- states
+      if (x$model$traits == 1) {
+        names(root) <- c("0", "1")
+      } else {
+        names(root) <- c("00", "01", "10", "11")
+      }
       print(root)
     }
     return()
@@ -317,7 +322,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
     } else {
       cat("Root prior:\n")
       root <- x$root
-      names(root) <- states
+      names(root) <- c("0", "1")
       print(root)
     }
     return()
@@ -353,7 +358,7 @@ print.fit_sinba <- function(x, digits = 6, ...) {
   } else {
     cat("Root prior:\n")
     root <- x$root
-    names(root) <- states
+    names(root) <- c("00", "01", "10", "11")
     print(root)
   }
 }
@@ -390,10 +395,11 @@ print.fit_sinba <- function(x, digits = 6, ...) {
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_simultaneous <- function(
-    tree, data, model = NULL,
-    pi_xy = NULL,
-    root = NULL,
-    opts = NULL) {
+  tree, data, model = NULL,
+  pi_xy = NULL,
+  root = NULL,
+  opts = NULL
+) {
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -414,26 +420,24 @@ fit_simultaneous <- function(
   t <- phylo_to_sinba(tree)
 
   if (length(pi_xy) == 0) {
-    pi_xy <- rep(0, length(model$states))
-    for (i in seq_len(length(model$states))) {
-      if (model$observed[[model$states[i]]] == "11") {
-        pi_xy[i] <- 1
-      }
-    }
+    pi_xy <- c(0, 0, 0, 1)
   }
-  if (length(pi_xy) != length(model$states)) {
-    stop("fit_simultaneous: invalid pi_xy: size different to number of states")
+  if (length(pi_xy) != 4) {
+    stop("fit_simultaneous: invalid pi_xy: size should be 4")
   }
-  if (sum(pi_xy) != 0) {
-    pi_xy <- pi_xy / sum(pi_xy)
-  }
+  # expando pi_xy if there are hidden states
+  pi_xy <- set_root_prior(model, pi_xy)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- default_root_prior()
+  }
+  if (length(root) != 4) {
+    stop("fit_simultaneous: invalid root: size should be 4")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -471,7 +475,7 @@ fit_simultaneous <- function(
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        r, pi_xy, pi_xy, root, TRUE
+        r, pi_xy, pi_xy, root_prior, TRUE
       )
       return(-lk)
     })
@@ -589,11 +593,12 @@ fit_simultaneous <- function(
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_mixed <- function(
-    tree, data, model = NULL,
-    trait = "x",
-    pi_trait = NULL,
-    root = NULL,
-    opts = NULL) {
+  tree, data, model = NULL,
+  trait = "x",
+  pi_trait = NULL,
+  root = NULL,
+  opts = NULL
+) {
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -613,8 +618,8 @@ fit_mixed <- function(
   }
   t <- phylo_to_sinba(tree)
 
-  pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
-  pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+  pi_x <- default_pi_vector()
+  pi_y <- default_pi_vector()
 
   if (trait == "x") {
     if (length(pi_trait) > 0) {
@@ -627,25 +632,25 @@ fit_mixed <- function(
   } else {
     stop("fit_mixed: unknown trait")
   }
-  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
-    stop("fit_mixed: invalid pi_trait: size different to number of states")
+  if (length(pi_x) != 2) {
+    stop("fit_mixed: invalid pi_trait: size should be 2")
   }
-  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
-    stop("fit_mixed: invalid pi_trait: size different to number of states")
+  if (length(pi_y) != 2) {
+    stop("fit_mixed: invalid pi_trait: size should be 2")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
-  if (sum(pi_y) != 0) {
-    pi_y <- pi_y / sum(pi_y)
-  }
+  pi_x <- expand_pi_vector(model$trait_states[["x"]]$states, pi_x)
+  pi_y <- expand_pi_vector(model$trait_states[["y"]]$states, pi_y)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- default_root_prior()
+  }
+  if (length(root) != 4) {
+    stop("fit_mixed: invalid root: size should be 4")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -692,7 +697,7 @@ fit_mixed <- function(
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        r, pi_x, pi_y, root
+        r, pi_x, pi_y, root_prior
       )
       return(-lk)
     })
@@ -831,10 +836,11 @@ fit_mixed <- function(
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_births <- function(
-    tree, data, births, model = NULL,
-    pi_x = NULL, pi_y = NULL,
-    root = NULL,
-    opts = NULL) {
+  tree, data, births, model = NULL,
+  pi_x = NULL, pi_y = NULL,
+  root = NULL,
+  opts = NULL
+) {
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -857,30 +863,30 @@ fit_fixed_births <- function(
   t <- phylo_to_sinba(tree)
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+    pi_x <- default_pi_vector()
   }
   if (length(pi_y) == 0) {
-    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+    pi_y <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
-    stop("fit_fixed_births: invalid pi_x: size different to number of states")
+  if (length(pi_x) != 2) {
+    stop("fit_fixed_births: invalid pi_x: size should be 2")
   }
-  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
-    stop("fit_fixed_births: invalid pi_y: size different to number of states")
+  if (length(pi_y) != 2) {
+    stop("fit_fixed_births: invalid pi_y: size should be 2")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
-  if (sum(pi_y) != 0) {
-    pi_y <- pi_y / sum(pi_y)
-  }
+  pi_x <- expand_pi_vector(model$trait_states[["x"]]$states, pi_x)
+  pi_y <- expand_pi_vector(model$trait_states[["y"]]$states, pi_y)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- default_root_prior()
+  }
+  if (length(root) != 4) {
+    stop("fit_fixed_births: invalid root: size should be 4")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -952,7 +958,7 @@ fit_fixed_births <- function(
       Q <- from_model_to_Q(mQ, p)
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
-        r, pi_x, pi_y, root
+        r, pi_x, pi_y, root_prior
       )
       return(-lk)
     })
@@ -1088,11 +1094,12 @@ fit_fixed_births <- function(
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_fixed_matrix <- function(
-    tree, data, rate_mat,
-    model = NULL,
-    pi_x = NULL, pi_y = NULL,
-    root = NULL,
-    opts = NULL) {
+  tree, data, rate_mat,
+  model = NULL,
+  pi_x = NULL, pi_y = NULL,
+  root = NULL,
+  opts = NULL
+) {
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -1125,30 +1132,30 @@ fit_fixed_matrix <- function(
   }
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+    pi_x <- default_pi_vector()
   }
   if (length(pi_y) == 0) {
-    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+    pi_y <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
-    stop("fit_fixed_matrix: invalid pi_x: size different to number of states")
+  if (length(pi_x) != 2) {
+    stop("fit_fixed_matrix: invalid pi_x: size should be 2")
   }
-  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
-    stop("fit_fixed_matrix: invalid pi_y: size different to number of states")
+  if (length(pi_y) != 2) {
+    stop("fit_fixed_matrix: invalid pi_y: size should be 2")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
-  if (sum(pi_y) != 0) {
-    pi_y <- pi_y / sum(pi_y)
-  }
+  pi_x <- expand_pi_vector(model$trait_states[["x"]]$states, pi_x)
+  pi_y <- expand_pi_vector(model$trait_states[["y"]]$states, pi_y)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- default_root_prior()
+  }
+  if (length(root) != 4) {
+    stop("fit_fixed_matrix: invalid root: size should be 4")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -1177,7 +1184,7 @@ fit_fixed_matrix <- function(
 
       lk <- sinba_like(
         t, rate_mat, model, births, xt, cond,
-        r, pi_x, pi_y, root
+        r, pi_x, pi_y, root_prior
       )
       return(-lk)
     })
@@ -1308,10 +1315,11 @@ fit_fixed_matrix <- function(
 #'   By default it use FitzJohn et al. (2009) method,
 #'   in which ancestral states are weighted by its own likelihood.
 fixed_sinba <- function(
-    tree, data, rate_mat, births,
-    model = NULL,
-    pi_x = NULL, pi_y = NULL,
-    root = NULL) {
+  tree, data, rate_mat, births,
+  model = NULL,
+  pi_x = NULL, pi_y = NULL,
+  root = NULL
+) {
   if (is.null(model)) {
     model <- new_model("IND")
   }
@@ -1342,30 +1350,30 @@ fixed_sinba <- function(
   }
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+    pi_x <- default_pi_vector()
   }
   if (length(pi_y) == 0) {
-    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+    pi_y <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
-    stop("fixed_sinba: invalid pi_x: size different to number of states")
+  if (length(pi_x) != 2) {
+    stop("fixed_sinba: invalid pi_x: size should be 2")
   }
-  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
-    stop("fixed_sinba: invalid pi_y: size different to number of states")
+  if (length(pi_y) != 2) {
+    stop("fixed_sinba: invalid pi_y: size should be 2")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
-  if (sum(pi_y) != 0) {
-    pi_y <- pi_y / sum(pi_y)
-  }
+  pi_x <- expand_pi_vector(model$trait_states[["x"]]$states, pi_x)
+  pi_y <- expand_pi_vector(model$trait_states[["y"]]$states, pi_y)
 
-  if ((is.null(root)) || (sum(root) == 0)) {
-    root <- rep(0, length(model$states))
+  if (is.null(root)) {
+    root <- default_root_prior()
+  }
+  if (length(root) != 4) {
+    stop("fixed_sinba: invalid root: size should be 4")
   }
   if (sum(root) != 0) {
     root <- root / sum(root)
   }
+  root_prior <- set_root_prior(model, root)
 
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
@@ -1448,7 +1456,7 @@ fixed_sinba <- function(
     xt <- tree_to_cpp(t)
     lk <- sinba_like(
       t, rate_mat, model, births, xt, cond,
-      r, pi_x, pi_y, root
+      r, pi_x, pi_y, root_prior
     )
     if (lk > res$objective) {
       res <- list(
@@ -1513,8 +1521,9 @@ fixed_sinba <- function(
 # sinba_like calculates the likelihood
 # of the sinba model.
 sinba_like <- function(
-    t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root,
-    simultaneous = FALSE) {
+  t, Q, model, births, xt, cond, root, pi_x, pi_y, pi_root,
+  simultaneous = FALSE
+) {
   sc <- sinba_cond(
     t, Q, model, births, xt, cond, root, pi_x, pi_y,
     simultaneous
@@ -1541,7 +1550,8 @@ add_root_prior <- function(likes, pi) {
 # sinba_cond return the conditional likelihoods
 # under the sinba model.
 sinba_cond <- function(
-    t, Q, model, births, xt, cond, root, pi_x, pi_y, simultaneous) {
+  t, Q, model, births, xt, cond, root, pi_x, pi_y, simultaneous
+) {
   Q <- normalize_Q(Q)
 
   root_vector <- rep(0, 4)
