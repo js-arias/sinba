@@ -54,6 +54,8 @@ and it is the best model of the four examined models.
 # An example from the book of Revell & Harmon (2022)
 # section 7.2.2,
 # pp. 173-177.
+library(phytools)
+library(RColorBrewer)
 
 x <- c(0, 0, rep(1, 12), rep(0, 12))
 y <- x
