@@ -56,6 +56,7 @@ and it is the best model of the four examined models.
 # pp. 173-177.
 library(phytools)
 library(RColorBrewer)
+library(sinba)
 
 x <- c(0, 0, rep(1, 12), rep(0, 12))
 y <- x
