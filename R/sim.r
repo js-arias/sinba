@@ -91,23 +91,19 @@ sim_sinba <- function(
   }
 
   if (length(pi_x) == 0) {
-    pi_x <- default_pi_vector(model$trait_states[["x"]]$states)
+    pi_x <- default_pi_vector()
   }
   if (length(pi_y) == 0) {
-    pi_y <- default_pi_vector(model$trait_states[["y"]]$states)
+    pi_y <- default_pi_vector()
   }
-  if (length(pi_x) != length(model$trait_states[["x"]]$states)) {
-    stop("sim_sinba: invalid pi_x: size different to number of states")
+  if (length(pi_x) != 2) {
+    stop("fit_sinba: invalid pi_x: size should be 2")
   }
-  if (length(pi_y) != length(model$trait_states[["y"]]$states)) {
-    stop("sim_sinba: invalid pi_y: size different to number of states")
+  if (length(pi_y) != 2) {
+    stop("fit_sinba: invalid pi_y: size should be 2")
   }
-  if (sum(pi_x) != 0) {
-    pi_x <- pi_x / sum(pi_x)
-  }
-  if (sum(pi_y) != 0) {
-    pi_y <- pi_y / sum(pi_y)
-  }
+  pi_x <- expand_pi_vector(model$trait_states[["x"]]$states, pi_x)
+  pi_y <- expand_pi_vector(model$trait_states[["y"]]$states, pi_y)
 
   if (is.null(births)) {
     max_size <- length(t$tip) * 0.75
