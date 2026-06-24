@@ -119,6 +119,9 @@ fit_sinba <- function(
       }
 
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
         r, pi_x, pi_y, root_prior
@@ -473,6 +476,9 @@ fit_simultaneous <- function(
       }
 
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
         r, pi_xy, pi_xy, root_prior, TRUE
@@ -695,6 +701,10 @@ fit_mixed <- function(
       }
 
       Q <- from_model_to_Q(mQ, p[transition_start:length(p)])
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
+
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
         r, pi_x, pi_y, root_prior
@@ -956,6 +966,9 @@ fit_fixed_births <- function(
       }
 
       Q <- from_model_to_Q(mQ, p)
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
       lk <- sinba_like(
         t, Q, model, births, xt, cond,
         r, pi_x, pi_y, root_prior

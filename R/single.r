@@ -59,6 +59,9 @@ fit_sinba_single <- function(
         age = t$br_len[n] + p[1] - t$age[n]
       )
       Q <- from_model_to_Q(mQ, p[2:length(p)])
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
         r, pi_x, root_prior
@@ -195,6 +198,9 @@ fit_sinba_single_fixed_birth <- function(
         return(Inf)
       }
       Q <- from_model_to_Q(mQ, p)
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
       lk <- sinba_single_like(
         t, Q, model, birth, xt, cond,
         r, pi_x, root_prior

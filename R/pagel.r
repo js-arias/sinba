@@ -25,9 +25,10 @@
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
 fit_pagel <- function(
-    tree, data, model = NULL,
-    root_method = "fitzjohn", root = NULL,
-    opts = NULL) {
+  tree, data, model = NULL,
+  root_method = "fitzjohn", root = NULL,
+  opts = NULL
+) {
   if (!inherits(tree, "phylo")) {
     stop("fit_pagel: `tree` must be an object of class \"phylo\".")
   }
@@ -52,6 +53,8 @@ fit_pagel <- function(
   et <- encode_traits(t, data, 2)
   cond <- set_conditionals(t, et, model)
 
+  max_rate <- maximum_transition_rate / max(t$ages)
+
   # closure for the likelihood function
   like_func <- function() {
     xt <- tree_to_cpp(t)
@@ -60,11 +63,14 @@ fit_pagel <- function(
       if (any(p < 0)) {
         return(Inf)
       }
-      if (any(p > maximum_transition_rate)) {
+      if (any(p > max_rate)) {
         return(Inf)
       }
 
       Q <- from_model_to_Q(mQ, p)
+      if (any(Q < -max_rate)) {
+        return(Inf)
+      }
       lk <- mk_like(t, Q, xt, cond, root)
       return(-lk)
     })
