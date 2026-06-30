@@ -113,6 +113,24 @@ get_node_by_len <- function(t, l, n) {
   return(t$root_id)
 }
 
+# most_recent_common_ancestor returns the node
+# that is the most recent common ancestor of two nodes
+most_recent_common_ancestor <- function(t, n1, n2) {
+  p1 <- path_to_node(t, n1)
+  p2 <- path_to_node(t, n2)
+  x <- t$root_id
+  for (i in seq_len(length(p1))) {
+    if (i > length(p2)) {
+      break
+    }
+    if (p1[i] != p2[i]) {
+      break
+    }
+    x <- p1[i]
+  }
+  return(x)
+}
+
 # path_to_node returns the path from the root
 # to a given node.
 path_to_node <- function(t, n) {
