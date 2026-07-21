@@ -12,7 +12,8 @@ fit_fixed_births(
   pi_x = NULL,
   pi_y = NULL,
   root = NULL,
-  opts = NULL
+  opts = NULL,
+  reps = 100
 )
 }
 \arguments{
@@ -51,6 +52,10 @@ in which ancestral states are weighted by its own likelihood.}
 \item{opts}{User defined parameters for the optimization
 with the \code{nloptr} package.
 By default it attempts a reasonable set of options.}
+
+\item{reps}{Number of replications
+(i.e., parameter searches).
+The default is 100.}
 }
 \description{
 \code{fit_fixed_births()} searches for the maximum likelihood estimate

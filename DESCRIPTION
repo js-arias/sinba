@@ -13,7 +13,6 @@ Description: Package sinba implements the Single Birth of a Trait model
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
 LinkingTo: 
     cpp11,
     cpp11armadillo
@@ -28,3 +27,4 @@ Suggests:
     RColorBrewer
 Config/testthat/edition: 3
 VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0

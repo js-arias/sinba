@@ -24,10 +24,14 @@
 #' @param opts User defined parameters for the optimization
 #'   with the `nloptr` package.
 #'   By default it attempts a reasonable set of options.
+#' @param reps Number of replications
+#'   (i.e., parameter searches).
+#'   The default is 100.
 fit_pagel <- function(
   tree, data, model = NULL,
   root_method = "fitzjohn", root = NULL,
-  opts = NULL
+  opts = NULL,
+  reps = 100
 ) {
   if (!inherits(tree, "phylo")) {
     stop("fit_pagel: `tree` must be an object of class \"phylo\".")
@@ -77,24 +81,44 @@ fit_pagel <- function(
   }
 
   if (is.null(opts)) {
-    opts <- def_nloptr_opts(k)
+    opts <- def_nloptr_opts(k, length(tree$tip.label))
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
   }
 
-  fn <- like_func()
-  par <- c(runif(k))
-  rr <- nloptr::nloptr(
-    x0 = par,
-    eval_f = fn,
-    opts = opts
-  )
+  if (reps < 0) {
+    reps <- 100
+  }
+  likes <- rep(Inf, reps)
+  res <- list(objective = Inf)
+  for (i in seq_len(reps)) {
+    fn <- like_func()
+    par <- c(runif(k))
+    rr <- nloptr::nloptr(
+      x0 = par,
+      eval_f = fn,
+      opts = opts
+    )
+    likes[i] <- rr$objective
 
-  q <- from_model_to_Q(mQ, rr$solution)
+    if (rr$objective < res$objective) {
+      res <- rr
+    }
+  }
+  hits <- 0
+  for (i in seq_len(length(likes))) {
+    if (abs(likes[i] - res$objective) < 1) {
+      hits <- hits + 1
+    }
+  }
+
+  q <- from_model_to_Q(mQ, res$solution)
   q <- normalize_Q(q)
   obj <- list(
-    logLik = -rr$objective,
+    logLik = -res$objective,
+    hits = hits,
+    reps = reps,
     k = k,
     root = root,
     model = model,
@@ -150,6 +174,7 @@ print.fit_mk <- function(x, digits = 6, ...) {
   fit <- c(x$logLik, aic, aicc)
   names(fit) <- c("logLik", "AIC", "AICc")
   print(fit)
+  cat(paste(x$hits, " hits of ", x$reps, " replicates.\n", sep = ""))
 
   cat("Rates:\n")
   Q <- x$Q

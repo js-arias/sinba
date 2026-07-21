@@ -12,7 +12,7 @@ test_that("fit_sinba works", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  expect_no_error(fit_sinba(tree, data_xz, new_model("IND")))
+  expect_no_error(fit_sinba(tree, data_xz, new_model("IND"), reps = 1))
 })
 
 test_that("fit_sinba works with a simultaneous birth", {
@@ -23,7 +23,7 @@ test_that("fit_sinba works with a simultaneous birth", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  expect_no_error(fit_simultaneous(tree, data_xz, new_model("IND")))
+  expect_no_error(fit_simultaneous(tree, data_xz, new_model("IND"), reps = 1))
 })
 
 test_that("fit_sinba works with hidden model", {
@@ -43,7 +43,7 @@ test_that("fit_sinba works with hidden model", {
     )
   )
 
-  expect_no_error(fit_sinba(tree, data_xz, model_as(hm, "IND")))
+  expect_no_error(fit_sinba(tree, data_xz, model_as(hm, "IND"), reps = 1))
 })
 
 test_that("pagel works", {
@@ -54,7 +54,7 @@ test_that("pagel works", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  expect_no_error(fit_pagel(tree, data_xz, new_model("IND")))
+  expect_no_error(fit_pagel(tree, data_xz, new_model("IND"), reps = 1))
 })
 
 test_that("pagel works with hidden model", {
@@ -75,7 +75,7 @@ test_that("pagel works with hidden model", {
     )
   )
 
-  expect_no_error(fit_pagel(tree, data_xz, model_as(hm, "IND")))
+  expect_no_error(fit_pagel(tree, data_xz, model_as(hm, "IND"), reps = 1))
 })
 
 test_that("fit_mixed works", {
@@ -88,7 +88,7 @@ test_that("fit_mixed works", {
 
   expect_no_error(fit_mixed(
     tree, data_xz,
-    trait = "x"
+    trait = "x", reps = 1
   ))
 })
 
@@ -112,7 +112,8 @@ test_that("fit_fixed_births works", {
   )
 
   expect_no_error(fit_fixed_births(
-    tree, data_xz, births
+    tree, data_xz, births,
+    reps = 1
   ))
 })
 
@@ -133,7 +134,7 @@ test_that("fit_fixed_matrix works", {
 
   expect_no_error(fit_fixed_matrix(
     tree, data_xz, q,
-    model = new_model("IND")
+    model = new_model("IND"), reps = 1
   ))
 })
 
@@ -166,7 +167,7 @@ test_that("fit_fixed_matrix works with hidden model", {
 
   expect_no_error(fit_fixed_matrix(
     tree, data_xz, hq,
-    model = model_as(hm, "IND")
+    model = model_as(hm, "IND"), reps = 1
   ))
 })
 
@@ -273,7 +274,7 @@ test_that("fit_sinba_single works with hidden model", {
     traits = 1
   )
 
-  expect_no_error(fit_sinba(tree, data_z, model = hm))
+  expect_no_error(fit_sinba(tree, data_z, model = hm, reps = 1))
 })
 
 test_that("fixed_sinba works on a single trait", {
@@ -345,7 +346,7 @@ test_that("map_sinba works", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  fz <- fit_sinba(tree, data_xz, new_model("IND"))
+  fz <- fit_sinba(tree, data_xz, new_model("IND"), reps = 1)
 
   expect_no_error(map_sinba(fz, n = 2))
 })
@@ -359,7 +360,7 @@ test_that("map_pagel works", {
   z <- c(0, 0, rep(c(0, 1), 6), rep(0, 12))
   data_xz <- data.frame(LETTERS, x, z)
 
-  fz <- fit_pagel(tree, data_xz, new_model("IND"))
+  fz <- fit_pagel(tree, data_xz, new_model("IND"), reps = 1)
 
   expect_no_error(map_pagel(fz, n = 2))
 })

@@ -1,7 +1,8 @@
 fit_sinba_single <- function(
   tree, data, model,
   pi_x, root,
-  opts
+  opts,
+  reps
 ) {
   if (!inherits(tree, "phylo")) {
     stop("fit_sinba: `tree` must be an object of class \"phylo\".")
@@ -71,7 +72,7 @@ fit_sinba_single <- function(
   }
 
   if (is.null(opts)) {
-    opts <- def_nloptr_opts(k)
+    opts <- def_nloptr_opts(k, length(tree$tip.label))
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
@@ -79,34 +80,51 @@ fit_sinba_single <- function(
 
   root_states <- c("0", "1")
 
+  if (reps < 0) {
+    reps <- 100
+  }
+  likes <- rep(Inf, reps)
   res <- list(objective = Inf)
-  for (r in sample(seq_len(length(root_states)))) {
-    if (sum(root) != 0) {
-      is_valid_root <- FALSE
-      for (i in seq_len(length(model$states))) {
-        obs <- model$observed[[model$states[i]]]
-        if ((obs == root_states[r]) && (root[r] > 0)) {
-          is_valid_root <- TRUE
+  for (j in seq_len(reps)) {
+    loc <- Inf
+    for (r in sample(seq_len(length(root_states)))) {
+      if (sum(root) != 0) {
+        is_valid_root <- FALSE
+        for (i in seq_len(length(model$states))) {
+          obs <- model$observed[[model$states[i]]]
+          if ((obs == root_states[r]) && (root[r] > 0)) {
+            is_valid_root <- TRUE
+          }
+        }
+        if (!is_valid_root) {
+          next
         }
       }
-      if (!is_valid_root) {
-        next
+
+      youngest <- youngest_birth_event(t, et, root_states[r])
+      yn <- youngest[[1]]
+      fn <- like_func(yn, r)
+      par <- c(runif(1, max = t$age[yn]), runif(max(mQ)))
+      rr <- nloptr::nloptr(
+        x0 = par,
+        eval_f = fn,
+        opts = opts
+      )
+      if (rr$objective < res$objective) {
+        rr$root <- r
+        rr$yn <- yn
+        res <- rr
+      }
+      if (rr$objective < loc) {
+        loc <- rr$objective
       }
     }
-
-    youngest <- youngest_birth_event(t, et, root_states[r])
-    yn <- youngest[[1]]
-    fn <- like_func(yn, r)
-    par <- c(runif(1, max = t$age[yn]), runif(max(mQ)))
-    rr <- nloptr::nloptr(
-      x0 = par,
-      eval_f = fn,
-      opts = opts
-    )
-    if (rr$objective < res$objective) {
-      rr$root <- r
-      rr$yn <- yn
-      res <- rr
+    likes[j] <- loc
+  }
+  hits <- 0
+  for (i in seq_len(length(likes))) {
+    if (abs(likes[i] - res$objective) < 1) {
+      hits <- hits + 1
     }
   }
 
@@ -120,6 +138,8 @@ fit_sinba_single <- function(
 
   obj <- list(
     logLik = -res$objective,
+    hits = hits,
+    reps = reps,
     k = k,
     model = model,
     Q = q,
@@ -136,7 +156,8 @@ fit_sinba_single <- function(
 fit_sinba_single_fixed_birth <- function(
   tree, data, birth, model,
   pi_x, root,
-  opts
+  opts,
+  reps
 ) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_births: `tree` must be an object of class \"phylo\".")
@@ -210,7 +231,7 @@ fit_sinba_single_fixed_birth <- function(
   }
 
   if (is.null(opts)) {
-    opts <- def_nloptr_opts(k)
+    opts <- def_nloptr_opts(k, length(tree$tip.label))
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
@@ -218,38 +239,55 @@ fit_sinba_single_fixed_birth <- function(
 
   root_states <- c("0", "1")
 
+  if (reps < 0) {
+    reps <- 100
+  }
+  likes <- rep(Inf, reps)
   res <- list(objective = Inf)
-  for (r in sample(seq_len(length(root_states)))) {
-    if (sum(root) != 0) {
-      is_valid_root <- FALSE
-      for (i in seq_len(length(model$states))) {
-        obs <- model$observed[[model$states[i]]]
-        if ((obs == root_states[r]) && (root[r] > 0)) {
-          is_valid_root <- TRUE
+  for (j in seq_len(reps)) {
+    loc <- Inf
+    for (r in sample(seq_len(length(root_states)))) {
+      if (sum(root) != 0) {
+        is_valid_root <- FALSE
+        for (i in seq_len(length(model$states))) {
+          obs <- model$observed[[model$states[i]]]
+          if ((obs == root_states[r]) && (root[r] > 0)) {
+            is_valid_root <- TRUE
+          }
+        }
+        if (!is_valid_root) {
+          next
         }
       }
-      if (!is_valid_root) {
+
+      youngest <- youngest_birth_event(t, et, root_states[r])
+      yn <- youngest[[1]]
+      if (!is_valid_birth(t, birth$node, yn)) {
         next
       }
-    }
 
-    youngest <- youngest_birth_event(t, et, root_states[r])
-    yn <- youngest[[1]]
-    if (!is_valid_birth(t, birth$node, yn)) {
-      next
+      fn <- like_func(yn, r)
+      par <- runif(max(mQ))
+      rr <- nloptr::nloptr(
+        x0 = par,
+        eval_f = fn,
+        opts = opts
+      )
+      if (rr$objective < res$objective) {
+        rr$root <- r
+        rr$yn <- yn
+        res <- rr
+      }
+      if (rr$objective < loc) {
+        loc <- rr$objective
+      }
     }
-
-    fn <- like_func(yn, r)
-    par <- runif(max(mQ))
-    rr <- nloptr::nloptr(
-      x0 = par,
-      eval_f = fn,
-      opts = opts
-    )
-    if (rr$objective < res$objective) {
-      rr$root <- r
-      rr$yn <- yn
-      res <- rr
+    likes[j] <- loc
+  }
+  hits <- 0
+  for (i in seq_len(length(likes))) {
+    if (abs(likes[i] - res$objective) < 1) {
+      hits <- hits + 1
     }
   }
 
@@ -258,6 +296,8 @@ fit_sinba_single_fixed_birth <- function(
   if (is.infinite(res$objective)) {
     obj <- list(
       logLik = -Inf,
+      hits = 0,
+      reps = reps,
       k = k,
       model = model,
       Q = matrix(nrow = 4, ncol = 4),
@@ -276,6 +316,8 @@ fit_sinba_single_fixed_birth <- function(
 
   obj <- list(
     logLik = -res$objective,
+    hits = hits,
+    reps = reps,
     k = k,
     model = model,
     Q = q,
@@ -291,7 +333,7 @@ fit_sinba_single_fixed_birth <- function(
 
 fit_sinba_single_fixed_matrix <- function(
   tree, data, rate_mat, model,
-  pi_x, root, opts
+  pi_x, root, opts, reps
 ) {
   if (!inherits(tree, "phylo")) {
     stop("fit_fixed_matrix: `tree` must be an object of class \"phylo\".")
@@ -364,7 +406,7 @@ fit_sinba_single_fixed_matrix <- function(
   }
 
   if (is.null(opts)) {
-    opts <- def_nloptr_opts(k)
+    opts <- def_nloptr_opts(k, length(tree$tip.label))
   }
   if (is.null(opts$algorithm)) {
     opts$algorithm <- "NLOPT_LN_SBPLX"
@@ -372,34 +414,51 @@ fit_sinba_single_fixed_matrix <- function(
 
   root_states <- c("0", "1")
 
+  if (reps < 0) {
+    reps <- 100
+  }
+  likes <- rep(Inf, reps)
   res <- list(objective = Inf)
-  for (r in sample(seq_len(length(root_states)))) {
-    if (sum(root) != 0) {
-      is_valid_root <- FALSE
-      for (i in seq_len(length(model$states))) {
-        obs <- model$observed[[model$states[i]]]
-        if ((obs == root_states[r]) && (root[r] > 0)) {
-          is_valid_root <- TRUE
+  for (j in seq_len(reps)) {
+    loc <- Inf
+    for (r in sample(seq_len(length(root_states)))) {
+      if (sum(root) != 0) {
+        is_valid_root <- FALSE
+        for (i in seq_len(length(model$states))) {
+          obs <- model$observed[[model$states[i]]]
+          if ((obs == root_states[r]) && (root[r] > 0)) {
+            is_valid_root <- TRUE
+          }
+        }
+        if (!is_valid_root) {
+          next
         }
       }
-      if (!is_valid_root) {
-        next
+
+      youngest <- youngest_birth_event(t, et, root_states[r])
+      yn <- youngest[[1]]
+      fn <- like_func(yn, r)
+      par <- runif(1, max = t$age[yn])
+      rr <- nloptr::nloptr(
+        x0 = par,
+        eval_f = fn,
+        opts = opts
+      )
+      if (rr$objective < res$objective) {
+        rr$root <- r
+        rr$yn <- yn
+        res <- rr
+      }
+      if (rr$objective < loc) {
+        loc <- rr$objective
       }
     }
-
-    youngest <- youngest_birth_event(t, et, root_states[r])
-    yn <- youngest[[1]]
-    fn <- like_func(yn, r)
-    par <- runif(1, max = t$age[yn])
-    rr <- nloptr::nloptr(
-      x0 = par,
-      eval_f = fn,
-      opts = opts
-    )
-    if (rr$objective < res$objective) {
-      rr$root <- r
-      rr$yn <- yn
-      res <- rr
+    likes[j] <- loc
+  }
+  hits <- 0
+  for (i in seq_len(length(likes))) {
+    if (abs(likes[i] - res$objective) < 1) {
+      hits <- hits + 1
     }
   }
 
@@ -412,6 +471,8 @@ fit_sinba_single_fixed_matrix <- function(
 
   obj <- list(
     logLik = -res$objective,
+    hits = hits,
+    reps = reps,
     k = k,
     model = model,
     Q = q,

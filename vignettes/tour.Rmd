@@ -140,7 +140,10 @@ sinba_x_er <- fit_sinba(
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0)
+  root = c(0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 # an all rates different model
 sinba_x_ard <- fit_sinba(tree, data_xy,
@@ -154,7 +157,10 @@ sinba_x_ard <- fit_sinba(tree, data_xy,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0)
+  root = c(0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 
 # the fit results can be printed with useful information
@@ -201,8 +207,10 @@ for the state 1 in both *x* and *y* traits.
 
 ```{r}
 # Pagel model
-pagel_xy_ind <- fit_pagel(tree, data_xy)
-pagel_xy_corr <- fit_pagel(tree, data_xy, model = new_model("CORR"))
+# to reduce computing time we use only 10 replicates,
+# the default is 100.
+pagel_xy_ind <- fit_pagel(tree, data_xy, reps = 10)
+pagel_xy_corr <- fit_pagel(tree, data_xy, model = new_model("CORR"), reps = 10)
 
 # print the results
 pagel_xy_ind
@@ -218,7 +226,10 @@ sinba_xy_ind <- fit_sinba(tree, data_xy,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 sinba_xy_corr <- fit_sinba(tree, data_xy,
   model = new_model("CORR"),
@@ -230,7 +241,10 @@ sinba_xy_corr <- fit_sinba(tree, data_xy,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 
 # print the results
@@ -279,7 +293,10 @@ fit_sinba(tree, data_xy, new_model("ER"),
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 
 # Symmetric model with sinba
@@ -292,7 +309,10 @@ fit_sinba(tree, data_xy, new_model("SYM"),
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 
 # a custom model
@@ -310,7 +330,10 @@ fit_sinba(tree, data_xy, m,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -348,7 +371,10 @@ fit_sinba(tree, data_xw,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -374,7 +400,10 @@ fit_simultaneous(tree, data_xw,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -411,7 +440,10 @@ fit_sinba(tree, data_xz,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -446,7 +478,10 @@ fit_mixed(tree, data_xz,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -488,7 +523,10 @@ fit_sinba(tree, data_xh,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -535,7 +573,10 @@ fit_sinba(tree, data_xh,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -584,7 +625,10 @@ fit_fixed_births(tree, data_xy, bb,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter.
   # We put it here just for completeness
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 
@@ -621,7 +665,10 @@ fit_fixed_matrix(tree, data_xy, q,
   # (the FitzJohn prior)
   # we can safely ignore the root parameter
   # We put it here just for completeness.
-  root = c(0, 0, 0, 0)
+  root = c(0, 0, 0, 0),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 ```
 

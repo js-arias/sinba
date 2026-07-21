@@ -13,6 +13,7 @@ Package sinba implements the Single Birth of a Trait model to infer the correlat
 
 Authors:
 \itemize{
+  \item J. Salvador Arias \email{jsalarias@gmail.com} (\href{https://orcid.org/0000-0002-3717-435x}{ORCID}) [copyright holder]
   \item Sergei Tarasov \email{sergei.tarasov@helsinki.fi}
 }
 

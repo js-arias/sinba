@@ -167,7 +167,11 @@ data_mp <- data.frame(taxa = LETTERS, m = m, p = p)
 data_mq <- data.frame(taxa = LETTERS, m = m, q = q)
 
 # --- m vs n
-pagel_mn_ind <- fit_pagel(tree, data_mn)
+# parameter reps indicate the number of attempts
+# of the search of the parameters.
+# The default is 100,
+# here we use 10 to reduce the computation time
+pagel_mn_ind <- fit_pagel(tree, data_mn, reps = 10)
 
 # compare the likelihood of both traits calculated independently
 # (calculated with PhyTools)
@@ -178,7 +182,7 @@ pagel_mn_ind$logLik
 
 # compare the independent and correlated model
 # using AIC
-pagel_mn_corr <- fit_pagel(tree, data_mn, model = new_model("CORR"))
+pagel_mn_corr <- fit_pagel(tree, data_mn, model = new_model("CORR"), reps = 10)
 aic_mn <- setNames(
   c(
     AIC(pagel_mn_ind),
@@ -189,7 +193,7 @@ aic_mn <- setNames(
 aic_mn
 
 # --- m vs p
-pagel_mp_ind <- fit_pagel(tree, data_mp)
+pagel_mp_ind <- fit_pagel(tree, data_mp, reps = 10)
 
 # compare the likelihood of both traits calculated independently
 # (calculated with PhyTools)
@@ -200,7 +204,7 @@ pagel_mp_ind$logLik
 
 # compare the independent and correlated model
 # using AIC
-pagel_mp_corr <- fit_pagel(tree, data_mp, model = new_model("CORR"))
+pagel_mp_corr <- fit_pagel(tree, data_mp, model = new_model("CORR"), reps = 10)
 aic_mp <- setNames(
   c(
     AIC(pagel_mp_ind),
@@ -211,7 +215,7 @@ aic_mp <- setNames(
 aic_mp
 
 # --- m vs q
-pagel_mq_ind <- fit_pagel(tree, data_mq)
+pagel_mq_ind <- fit_pagel(tree, data_mq, reps = 10)
 
 # compare the likelihood of both traits calculated independently
 # (calculated with PhyTools)
@@ -222,7 +226,7 @@ pagel_mq_ind$logLik
 
 # compare the independent and correlated model
 # using AIC
-pagel_mq_corr <- fit_pagel(tree, data_mq, model = new_model("CORR"))
+pagel_mq_corr <- fit_pagel(tree, data_mq, model = new_model("CORR"), reps = 10)
 aic_mq <- setNames(
   c(
     AIC(pagel_mq_ind),
@@ -289,8 +293,8 @@ beyond that they happen to originate in the same clade.
 # Darwin's dilemma
 data_xy <- data.frame(LETTERS, x, y)
 
-pagel_xy_ind <- fit_pagel(tree, data_xy, model = new_model("IND"))
-pagel_xy_corr <- fit_pagel(tree, data_xy, model = new_model("CORR"))
+pagel_xy_ind <- fit_pagel(tree, data_xy, model = new_model("IND"), reps = 10)
+pagel_xy_corr <- fit_pagel(tree, data_xy, model = new_model("CORR"), reps = 10)
 aic_xy <- setNames(
   c(
     AIC(pagel_xy_ind),
@@ -303,8 +307,8 @@ aic_xy
 # Unreplicated burst
 data_xz <- data.frame(LETTERS, x, z)
 
-pagel_xz_ind <- fit_pagel(tree, data_xz, model = new_model("IND"))
-pagel_xz_corr <- fit_pagel(tree, data_xz, model = new_model("CORR"))
+pagel_xz_ind <- fit_pagel(tree, data_xz, model = new_model("IND"), reps = 10)
+pagel_xz_corr <- fit_pagel(tree, data_xz, model = new_model("CORR"), reps = 10)
 
 aic_xz <- setNames(
   c(
@@ -373,7 +377,10 @@ sinba_xy_ind <- fit_sinba(tree, data_xy,
   # as this is the default
   # we can safely ignore both the the pi_x and pi_y parameters
   # we put them here just for completeness
-  pi_x = c(0, 1), pi_y = c(0, 1)
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 # Sinba model for the Darwin's scenario with correlated evolution
 sinba_xy_corr <- fit_sinba(tree, data_xy,
@@ -381,7 +388,10 @@ sinba_xy_corr <- fit_sinba(tree, data_xy,
   # as this is the default
   # we can safely ignore both the the pi_x and pi_y parameters
   # we put them here just for completeness
-  pi_x = c(0, 1), pi_y = c(0, 1)
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 
 # compare AIC values from Pagel's models
@@ -404,7 +414,10 @@ sinba_xz_ind <- fit_sinba(tree, data_xz,
   # as this is the default
   # we can safely ignore both the the pi_x and pi_y parameters
   # we put them here just for completeness
-  pi_x = c(0, 1), pi_y = c(0, 1)
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 # Sinba model for the  unreplicated burst scenario with independent evolution
 sinba_xz_corr <- fit_sinba(tree, data_xz,
@@ -412,7 +425,10 @@ sinba_xz_corr <- fit_sinba(tree, data_xz,
   # as this is the default
   # we can safely ignore both the the pi_x and pi_y parameters
   # we put them here just for completeness
-  pi_x = c(0, 1), pi_y = c(0, 1)
+  pi_x = c(0, 1), pi_y = c(0, 1),
+  # to reduce computing time we use only 10 replicates,
+  # the default is 100.
+  reps = 10
 )
 
 # compare AIC values from Pagel's models
