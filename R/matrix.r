@@ -926,19 +926,19 @@ model_collapse <- function(model, tree, data) {
       obs[3] <- TRUE
     } else if (o == "11") {
       obs[4] <- TRUE
-    } else if (obs == "?0" || obs == "p0") {
+    } else if (o == "?0" || o == "p0") {
       obs[1] <- TRUE
       obs[3] <- TRUE
-    } else if (obs == "?1" || obs == "p1") {
+    } else if (o == "?1" || o == "p1") {
       obs[2] <- TRUE
       obs[4] <- TRUE
-    } else if (obs == "0?" || obs == "0p") {
+    } else if (o == "0?" || o == "0p") {
       obs[1] <- TRUE
       obs[2] <- TRUE
-    } else if (obs == "1?" || obs == "1p") {
+    } else if (o == "1?" || o == "1p") {
       obs[3] <- TRUE
       obs[4] <- TRUE
-    } else if (obs == "??" || obs == "p?" || obs == "?p" || obs == "pp") {
+    } else if (o == "??" || o == "p?" || o == "?p" || o == "pp") {
       obs <- c(TRUE, TRUE, TRUE, TRUE)
     }
   }
