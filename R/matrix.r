@@ -1065,6 +1065,92 @@ model_drop <- function(model, params) {
   return(model)
 }
 
+#' @export
+#' @title Set a Parameter to a Particular Model Cell
+#'
+#' @description
+#' `model_set()`` sets the parameter ID for a particular cell
+#' of the model matrix.
+#' If the ID is zero,
+#' it will remove the parameter ID of the indicated cell.
+#'
+#' @param model A model definition as build with `new_model()`.
+#' @param cell A vector with the row and column of the new parameter.
+#' @param id The ID of the parameter.
+model_set <- function(model, cell, id) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_set: `model` must be an object of class \"sinba_model\".")
+  }
+  m <- model$model
+  if (length(cell) < 2) {
+    stop("model_set: `cell` should at least have two elements.")
+  }
+  if (cell[1] < 1 || cell[1] > nrow(m)) {
+    return(model)
+  }
+  if (cell[2] < 1 || cell[2] > ncol(m)) {
+    return(model)
+  }
+  if (cell[1] == cell[2]) {
+    return(model)
+  }
+  if (id < 0) {
+    return(model)
+  }
+  m[cell[1], cell[2]] <- id
+  m <- format_model_matrix(m)
+  model$name <- "user defined"
+  model$model <- m
+  return(model)
+}
+
+#' @export
+#' @title Test If a Model is an Independent Model
+#'
+#' @description
+#' `is_independent()` returns true if a simple two trait model
+#' (i.e., without hidden states)
+#' using the Pagel conditions.
+#'
+#' @param model A model definition as built by ´new_model()´.
+is_independent <- function(model) {
+  if (!inherits(model, "sinba_model")) {
+    stop("model_add: `model` must be an object of class \"sinba_model\".")
+  }
+
+  if (model$traits != 2) {
+    return(FALSE)
+  }
+
+  m <- model$model
+  if (nrow(m) != 4) {
+    return(FALSE)
+  }
+  if (ncol(m) != 4) {
+    return(FALSE)
+  }
+
+  # check Pagel condition
+  if (m[1, 4] != 0 || m[2, 3] != 0 || m[3, 2] != 0 || m[4, 1] != 0) {
+    return(FALSE)
+  }
+
+  if (m[1, 2] != m[3, 4]) {
+    return(FALSE)
+  }
+  if (m[1, 3] != m[2, 4]) {
+    return(FALSE)
+  }
+  if (m[2, 1] != m[4, 3]) {
+    return(FALSE)
+  }
+  if (m[3, 1] != m[4, 2]) {
+    return(FALSE)
+  }
+
+  return(TRUE)
+}
+
 # from_model_to_Q sets a Q matrix
 # from a model matrix
 # and a set of parameter values.

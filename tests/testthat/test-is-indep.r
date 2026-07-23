@@ -1,0 +1,13 @@
+test_that("is_independent", {
+  expect_equal(is_independent(new_model("IND")), TRUE)
+  expect_equal(is_independent(new_model("ER")), TRUE)
+  expect_equal(is_independent(new_model("ER2")), TRUE)
+  expect_equal(is_independent(new_model("ERs")), TRUE)
+  expect_equal(is_independent(new_model("sCORR")), FALSE)
+  expect_equal(is_independent(new_model("IND")), TRUE)
+  expect_equal(is_independent(new_model("SYM")), FALSE)
+  expect_equal(is_independent(new_model("x")), FALSE)
+  expect_equal(is_independent(new_model("y")), FALSE)
+  expect_equal(is_independent(new_model("CORR")), FALSE)
+  expect_equal(is_independent(new_model("CMK")), FALSE)
+})
